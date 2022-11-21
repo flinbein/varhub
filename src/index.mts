@@ -1,6 +1,11 @@
-import ws from "ws";
+import {WebSocketServer} from "ws";
+import { env } from "process";
+import {VarHubServer} from "./varhub/VarHubServer.js";
 
-const msg: string = "Hello world23";
+const port = env.port ? Number(env.port) : 8088
 
-console.log(msg, ws);
-
+const wss = new WebSocketServer({
+    port,
+});
+const varhub = new VarHubServer(wss);
+console.log("VARHUB starts", port, varhub);
