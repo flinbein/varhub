@@ -1,10 +1,11 @@
-import type { WebSocketServer, WebSocket } from "ws";
+import type { WebSocket, WebSocketServer } from "ws";
 import { VarHubClient } from "./VarHubClient.js";
 import { Room } from "./Room.js";
 import * as process from "process";
 import { InPackage, InPackageType } from "./utils/Package.js";
 import { Buffer } from "buffer";
-import { checkForm, DataForm } from "./utils/convertArgs.js";
+import { parseJsonForm } from "./utils/dataForm.js";
+import { getRoomData } from "./utils/responseMapper.js";
 
 export class VarHubServer {
 	
@@ -41,12 +42,18 @@ export class VarHubServer {
 		}
 	}
 	
-	private createRoom(data: DataForm<typeof CREATE_ROOM_PACKET_FORM>){
+	private createRoom(type: string, controllerName: string): Room{
+		const roomId = this.generateFreeRoomId();
+		return new Room(this, roomId, type, controllerName);
+	}
 	
+	private joinRoom(client: VarHubClient, name: string, room: Room) {
+		this.clientInRoomMap.set(client, [room, name]);
+		room.join(client, name, false);
 	}
 	
 	handleInPackage(client: VarHubClient, inPackage: InPackage): string | Buffer | ArrayBufferView {
-		if (inPackage.type === InPackageType.TIME_SYNC) return Float64Array.of(this.getUptimeMs());
+		if (inPackage.type === InPackageType.TIME_SYNC) return JSON.stringify(this.getUptimeMs());
 		if (inPackage.type === InPackageType.CREATE_ROOM) return this.handleCreateRoom(client, inPackage);
 		// todo: create room | find room | join room
 		const [room] = this.getClientRoomAndName(client);
@@ -55,13 +62,13 @@ export class VarHubServer {
 	}
 	
 	handleCreateRoom(client: VarHubClient, inPackage: InPackage): string {
-		const data: unknown = JSON.parse(inPackage.data.toString("utf-8"));
-		if (!checkForm(CREATE_ROOM_PACKET_FORM, data)) throw new Error("wrong packet data format");
-		
-		this.generateFreeRoomId();
-		return JSON.stringify({
-		
-		})
+		const json = inPackage.data.toString("utf-8");
+		const {title, adminPassword, password, type, player, controller} = parseJsonForm(CREATE_ROOM_PACKET_FORM, json);
+		const room = this.createRoom(type, controller);
+		room.title = title ?? `${player}'s ${type}`
+		room.password = password ?? ""
+		room.adminPassword = adminPassword ?? "";
+		return getRoomData(room);
 	}
 }
 

@@ -1,0 +1,9 @@
+{
+	"preset": "ts-jest",
+	"testEnvironment": "node",
+	"verbose": true,
+	"moduleNameMapper": {
+		"^(.*).[mc]?js$": "$1"
+	},
+	"roots": ["src"]
+}

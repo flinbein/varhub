@@ -1,3 +1,5 @@
+import { Data } from "ws";
+
 const checkers = {
     "number": (r: unknown): r is number => typeof r === "number",
     "string": (r: unknown): r is string => typeof r === "string",
@@ -41,15 +43,8 @@ export function checkForm<T extends DeepMap>(form: T, data: unknown): data is Da
     return false;
 }
 
-///////////////////////////
-
-const data: any = JSON.parse("blah-blah");
-const REQUIRED_TYPE = {
-    active: "boolean",
-    cost: "number?",
-    type: ["mega","logo"]
-} as const;
-if (checkForm(REQUIRED_TYPE, data)){
-    const {active, cost, type} = data;
-    console.log(active, cost, type);
+export function parseJsonForm<T extends DeepMap>(form: T, json: string): DataForm<T> {
+	const data = JSON.parse(json);
+	if (checkForm(form, data)) return data;
+	throw new Error("wrong data format. Expected: "+JSON.stringify(form));
 }

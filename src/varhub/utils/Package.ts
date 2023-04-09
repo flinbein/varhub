@@ -1,4 +1,4 @@
-import { Buffer } from "buffer";
+import type Buffer from "buffer";
 
 export const enum OutPackageType {
 	CUSTOM = 0,
@@ -74,3 +74,4 @@ export class OutEventPackage<T extends EventPackageType>{
 		return Buffer.concat([header, this.data]);
 	}
 }
+
