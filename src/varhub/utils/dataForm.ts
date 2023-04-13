@@ -1,5 +1,3 @@
-import { Data } from "ws";
-
 const checkers = {
     "number": (r: unknown): r is number => typeof r === "number",
     "string": (r: unknown): r is string => typeof r === "string",
@@ -21,7 +19,7 @@ export type DataForm<T extends DeepMap> =
     T extends keyof TypeMap ? TypeMap[T] :
     T extends readonly (infer S)[] ? S :
     T extends `${infer K}?` ? (K extends keyof TypeMap ? TypeMap[K]: never) :
-    & { [K in ({[KK in keyof T]: T[KK] extends `${string}?` ? KK : never}[keyof T])]?: T[K] extends DeepMap ? Exclude<DataForm<T[K]>, undefined> : never }
+    & { [K in ({[KK in keyof T]: T[KK] extends `${string}?` ? KK : never}[keyof T])]?: T[K] extends DeepMap ? DataForm<T[K]> : never }
     & { [K in ({[KK in keyof T]: T[KK] extends keyof TypeMap ? KK : never}[keyof T])]: T[K] extends DeepMap ? DataForm<T[K]> : never }
     & { [K in ({[KK in keyof T]: T[KK] extends string ? never : KK }[keyof T])]: T[K] extends DeepMap ? DataForm<T[K]> : never }
 

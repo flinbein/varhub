@@ -1,5 +1,4 @@
-import type Buffer from "buffer";
-
+import { Buffer, default as Buff } from "buffer";
 export const enum OutPackageType {
 	CUSTOM = 0,
 	ERROR = 1,

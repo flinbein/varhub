@@ -1,24 +1,24 @@
 import { configureStore } from "@reduxjs/toolkit";
-import { StateArray, StateObject, StateValue } from "./StateMapper.js";
-import { StatePath, StateStep } from "./StateManager.js";
+import { XJArray, XJRecord, XJData } from "../../../utils/XJMapper.js";
+import { StatePath, StateStep } from "../../../utils/StateManager.js";
 import { createStateRecord, isStateRecord } from "./utils/path.js";
 import * as Path from "path";
 
 class RootState{
 	constructor(
-		public readonly value: StateValue = null,
+		public readonly value: XJData = null,
 		public readonly lastScore = new Number(0),
 	) {}
 }
 
-export function createStore(value: StateValue = null) {
+export function createStore(value: XJData = null) {
 	return configureStore({reducer: reducer});
 }
 
 const WMinPatch = new WeakMap<any, Number>;
 const WNewPatch = new WeakMap<any, [Number, Set<String>]>;
-const WMapPatch = new WeakMap<StateObject, Record<string, Number>>;
-const WArrayPatch = new WeakMap<StateArray, Array<Number>>;
+const WMapPatch = new WeakMap<XJRecord, Record<string, Number>>;
+const WArrayPatch = new WeakMap<XJArray, Array<Number>>;
 
 
 // Map: <min-patch: number, new-patch: [number, Set<string>], Map<key, last-patch>>
@@ -33,7 +33,7 @@ function reducer(root: RootState = new RootState(), patch: Patch): RootState {
 	return new RootState(value, lastScore);
 }
 
-function smallReducer(value: StateValue, valueStore: Number, path: StatePath, action: PatchAction, patchScore: Number): [StateValue, Number]{
+function smallReducer(value: XJData, valueStore: Number, path: StatePath, action: PatchAction, patchScore: Number): [XJData, Number]{
 	const step = path[0], tailPath = path.slice(1);
 	if (step) {
 		if (typeof step === "string") {
@@ -64,10 +64,10 @@ export type Patch = {
 }
 
 export type PatchActionsMap = {
-	set: { key: StateStep, value: StateValue };
+	set: { key: StateStep, value: XJData };
 	delete: { key: StateStep };
 	test: {};
-	splice: { start: number, deleteCount: number, items: StateValue[] };
+	splice: { start: number, deleteCount: number, items: XJData[] };
 }
 export type PatchAction = {
 	[key in keyof PatchActionsMap]: {type: key} & PatchActionsMap[key]

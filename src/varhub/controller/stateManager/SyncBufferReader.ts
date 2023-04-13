@@ -1,7 +1,7 @@
 import { Buffer } from "buffer";
 
 export class SyncBufferReader {
-	index = 0;
+	private index = 0;
 	constructor(private buffer: Buffer) {}
 	
 	private assertSize(bytesSize: number): void {
@@ -55,6 +55,10 @@ export class SyncBufferReader {
 	readUintSizeAndArrayBuffer(multiplier = 1): ArrayBuffer {
 		const {buffer, byteLength, byteOffset} = this.readUintSizeAndBuffer(multiplier);
 		return buffer.slice(byteOffset, byteOffset + byteLength)
+	}
+	
+	hasBytes(): boolean {
+		return this.index < this.buffer.length;
 	}
 	
 }

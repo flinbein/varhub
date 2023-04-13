@@ -1,25 +1,28 @@
 import { Buffer } from "buffer";
-import { SyncBufferReader } from "./SyncBufferReader.js";
+import { SyncBufferReader } from "../varhub/controller/stateManager/SyncBufferReader.js";
 
-export type StatePrimitive =
-	| null /*00*/ | boolean /*01,02*/ | number /*03*/ | bigint /*04*/ | string /*05*/
+export type XJPrimitive =
+	| null /*00*/ | boolean /*01,02*/ | number /*03 or 0xf_*/ | bigint /*04*/ | string /*05*/
 	| ArrayBuffer /*06*/
 	| Int8Array /*07*/ | Int16Array /*08*/ | Int32Array /*09*/
 	| Uint8Array  /*0a*/ | Uint16Array  /*0b*/ | Uint32Array  /*0c*/ | Uint8ClampedArray  /*0d*/
 	| Float32Array  /*0e*/ | Float64Array  /*0f*/ | BigInt64Array  /*10*/ | BigUint64Array  /*11*/
-export type StateArray = readonly StateValue[]  /*12*/
-export type StateObject = { [key: string]: StateValue }  /*13*/
+export type XJArray = readonly XJData[]  /*12*/
+export type XJRecord = { readonly [key: string]: XJData }  /*13*/
 
-export type StateValue = StatePrimitive | StateArray | StateObject;
+export type XJData = XJPrimitive | XJArray | XJRecord;
 
-export function serialize(val: StateValue): Buffer {
-	return Buffer.concat(_serialize(val));
+export function serialize(...val: XJData[]): Buffer {
+	return Buffer.concat(val.flatMap(data => _serialize(data)));
 }
 
-function _serialize(val: StateValue): (Buffer|Uint8Array)[] {
+function _serialize(val: XJData, pool?: Set<any>): Buffer[] {
+	if (pool?.has(val)) throw new Error("wrong xj format: recursive");
+	
 	if (val === null) return [Buffer.of(0x00)];
 	if (typeof val === "boolean") return [Buffer.of(val ? 0x02 : 0x01)];
 	if (typeof val === "number") {
+		if (Number.isInteger(val) && val >= 0 && val <= 0x0f) return [Buffer.of(0xf0 + val)]; // small integers
 		const buffer = Buffer.alloc(8);
 		buffer.writeDoubleLE(val);
 		return [Buffer.of(0x03), buffer];
@@ -51,30 +54,31 @@ function _serialize(val: StateValue): (Buffer|Uint8Array)[] {
 	if (Array.isArray(val)) return [
 		Buffer.of(0x12),
 		Buffer.from((Uint32Array.of(val.length)).buffer),
-		...val.flatMap(item => _serialize(item))
+		...val.flatMap(item => _serialize(item, new Set(pool).add(val)))
 	];
 	if (typeof val === "object") {
 		const names = Object.getOwnPropertyNames(val).sort();
-		const closedVal = val as StateObject;
+		const closedVal = val as XJRecord;
 		return [
 			Buffer.of(0x13),
 			Buffer.from((Uint32Array.of(names.length)).buffer),
 			...names.flatMap((key) => {
 				const [ignored_type, ...dataBin] = _serialize(key);
-				return [...dataBin, ..._serialize(closedVal[key]),]
+				return [...dataBin, ..._serialize(closedVal[key], new Set(pool).add(val))]
 			})
 		];
 	}
-	throw new Error("wrong state-val format");
+	throw new Error("wrong xj format: wrong type");
 }
 
-export function parse(data: Buffer): StateValue {
-	const parsedValue = _parse(new SyncBufferReader(data));
-	if (parsedValue === undefined) throw new Error("wrong binary state-data format");
-	return parsedValue;
+export function parse(data: Buffer, maxCount = Infinity): readonly XJData[] {
+	const result: XJData[] = []
+	const reader = new SyncBufferReader(data);
+	while (maxCount --> 0 && reader.hasBytes()) result.push(_parse(reader));
+	return result;
 }
 
-function _parse(data: SyncBufferReader, type?: number|null): StateValue {
+function _parse(data: SyncBufferReader, type?: number|null): XJData {
 	if (type == null) type = data.readUInt8();
 	if (type === 0x00) return null;
 	if (type === 0x01) return false;
@@ -103,7 +107,7 @@ function _parse(data: SyncBufferReader, type?: number|null): StateValue {
 		})
 		return result;
 	}
+	if (type >= 0xf0 && type <= 0xff) return type - 0xf0; // small integers
 	throw new Error("wrong binary state-data format");
-	
 }
 

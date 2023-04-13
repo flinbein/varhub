@@ -1,12 +1,12 @@
-import type { StateObject, StateValue } from "../StateMapper.js";
-import type { StatePath, StateStep } from "../StateManager.js";
+import type { XJRecord, XJData } from "../../../../utils/XJMapper.js";
+import type { StatePath, StateStep } from "../../../../utils/StateManager.js";
 
-export function select(value: StateValue|undefined, path: StatePath): StateValue | undefined{
+export function select(value: XJData|undefined, path: StatePath): XJData | undefined{
 	for (let step of path) value = selectStep(value, step)
 	return value;
 }
 
-export function canSet(state: StateValue|undefined, path: StatePath, value: StateValue): boolean {
+export function canSet(state: XJData|undefined, path: StatePath, value: XJData): boolean {
 	let requiredType: string = "";
 	for (let step of path) {
 		if (requiredType && typeof value !== requiredType) return false;
@@ -35,7 +35,7 @@ export function canSet(state: StateValue|undefined, path: StatePath, value: Stat
 	
 }
 
-function selectStep(value: StateValue|undefined, step: StateStep): StateValue | undefined{
+function selectStep(value: XJData|undefined, step: StateStep): XJData | undefined{
 	if (typeof step === "string") {
 		if (value == null) return undefined;
 		if (Object.getPrototypeOf(value) !== null) return undefined;
@@ -47,12 +47,12 @@ function selectStep(value: StateValue|undefined, step: StateStep): StateValue | 
 	return undefined;
 }
 
-export function isStateRecord(value: StateValue|undefined): value is StateObject {
+export function isStateRecord(value: XJData|undefined): value is XJRecord {
 	if (!value) return false;
 	return Object.getPrototypeOf(value) === null
 }
 
-export function createStateRecord(value: StateObject): StateObject {
+export function createStateRecord(value: XJRecord): XJRecord {
 	const result = Object.create(null);
 	for (let key in value) result[key] = value[key]
 	return result;

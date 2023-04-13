@@ -8,13 +8,15 @@ import {
 	OutPackageType,
 	OutResponsePackage
 } from "./utils/Package.js";
+import { TypeEmitter } from "./utils/TypedEmitter.js";
 
-export class VarHubClient {
+export class VarHubClient extends TypeEmitter {
 	
 	constructor(
 		private readonly connection: WebSocket,
 		private readonly server: VarHubServer
 	) {
+		super();
 		connection.on("message", async (data: Buffer) => {
 			const inPackage = InPackage.fromBytes(data);
 			try {
