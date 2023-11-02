@@ -1,20 +1,21 @@
 type CheckTypeFn<T = any> = (arg: unknown) => arg is T;
-type TypeChecker = CheckTypeFn | readonly [...TypeChecker[]] | {[key: string]: TypeChecker} |
-	null | boolean | number | string | undefined
+type TypeChecker =
+	| CheckTypeFn
+	| readonly TypeChecker[]
+	| {[key: string | number | symbol]: TypeChecker}
+	| null | boolean | number | string | undefined
 ;
-
-type CheckAssert<T extends readonly TypeChecker[]> = {
-	(arg: unknown): arg is TypeExtract<T[number]>
-	assert: <const A>(arg: A) => A & TypeExtract<T[number]>
-}
 
 type TypeExtract<T extends TypeChecker> =
-	T extends (arg: any) => arg is infer KT
+	T extends CheckTypeFn<infer KT>
 		? KT
+		: T extends any[] ? {[K in keyof T]: T[K] extends TypeChecker ? TypeExtract<T[K]> : never}
 		: T extends object
-			? { -readonly [K in keyof T]: T[K] extends TypeChecker ? TypeExtract<T[K]> : unknown }
+			? { -readonly [K in keyof T]: T[K] extends TypeChecker ? TypeExtract<T[K]> : never }
 			: T
 ;
+
+type JoinSpread<T, A> = T extends any[] ? [...T, ...A[]] : ["not-a-array", T]
 
 type TupleTypeExtract<A extends readonly TypeChecker[]> =
 	A extends readonly [infer H extends TypeChecker, ...(infer T extends TypeChecker[])]
@@ -22,17 +23,23 @@ type TupleTypeExtract<A extends readonly TypeChecker[]> =
 		: unknown;
 
 type TypeCheck = {
-	<const T extends readonly TypeChecker[]>(...args: T): CheckAssert<T>,
+	<const T extends readonly TypeChecker[]>(...args: T): CheckTypeFn<TypeExtract<T[number]>>
 	
 	readonly string: CheckTypeFn<string>
 	readonly number: CheckTypeFn<number>
 	readonly int: CheckTypeFn<number>
 	readonly any: CheckTypeFn<unknown>
 	readonly bool: CheckTypeFn<boolean>
+	
 	readonly optionalOf: <T extends TypeChecker>(arg: T) => CheckTypeFn<TypeExtract<T>|undefined>
-	readonly allOf: <const T extends readonly TypeChecker[]>(...args: T) => CheckTypeFn<TupleTypeExtract<T>>
-	readonly arrayOf: <T extends TypeChecker[]>(...args: T) => CheckTypeFn<TypeExtract<T[number]>[]>
-	readonly mapOf: <T extends TypeChecker[]>(...args: T) => CheckTypeFn<Partial<Record<string, TypeExtract<T[number]>>>>
+	readonly allOf: <const T extends readonly TypeChecker[]>(...args: T) => CheckTypeFn<TypeExtract<T[number]>>
+	readonly oneOf: <const T extends readonly TypeChecker[]>(...args: T) => CheckTypeFn<TypeExtract<T[number]>>
+	readonly arrayOf: <const T extends readonly TypeChecker[]>(...args: T) => CheckTypeFn<TypeExtract<T[number]>[]>
+	readonly mapOf: <const T extends readonly TypeChecker[]>(...args: T) => CheckTypeFn<Partial<Record<string, TypeExtract<T[number]>>>>
+	
+	readonly spreadOf: <const T extends readonly TypeChecker[], const U extends TypeChecker = (arg: any) => arg is any>(args: T, spread?: U) => CheckTypeFn<JoinSpread<TypeExtract<T>, TypeExtract<U>>>
+	
+	readonly assert: <const A, T extends TypeChecker>(data: A, type: T, errorMessage?: string) => unknown extends A ? TypeExtract<T> : A & TypeExtract<T>
 }
 
 function checkType(checker: TypeChecker, item: unknown): boolean  {
@@ -60,36 +67,31 @@ function checkType(checker: TypeChecker, item: unknown): boolean  {
 	return Object.is(checker, item);
 }
 
-function mainT(...checkers: TypeChecker[]){
-	function check(item: unknown){
+function T(...checkers: TypeChecker[]){
+	return (item: unknown) => {
 		for (let checker of checkers) {
 			if (checkType(checker, item)) return true;
 		}
 		return false;
 	}
-	check.assert = (item: unknown) => {
-		if (check(item)) return item;
-		throw new Error("wrong type format");
-	}
-	return check;
 }
 
-const T = mainT as unknown as TypeCheck;
-export default T;
+export default T as unknown as TypeCheck;
 
-mainT.string = (value: unknown) => typeof value === "string"
+T.oneOf = T;
+T.string = (value: unknown) => typeof value === "string"
 
-mainT.number = (value: unknown) => typeof value === "number"
+T.number = (value: unknown) => typeof value === "number"
 
-mainT.int = (value: unknown) => typeof value === "number" && Number.isInteger(value)
+T.int = (value: unknown) => typeof value === "number" && Number.isInteger(value)
 
-mainT.any = (_: unknown) => true;
-mainT.bool = (value: unknown) => typeof value === "boolean"
+T.any = (_: unknown) => true;
+T.bool = (value: unknown) => typeof value === "boolean"
 
-mainT.optionalOf = (t: TypeChecker) => (value: unknown) => value === undefined || checkType(t, value)
+T.optionalOf = (t: TypeChecker) => (value: unknown) => value === undefined || checkType(t, value)
 
-mainT.arrayOf = (...t: TypeChecker[]) => {
-	const check = mainT(...t);
+T.arrayOf = (...t: TypeChecker[]) => {
+	const check = T(...t);
 	return (value: unknown) => {
 		if (!Array.isArray(value)) return false;
 		for (const item of value) {
@@ -99,8 +101,22 @@ mainT.arrayOf = (...t: TypeChecker[]) => {
 	}
 }
 
-mainT.mapOf = (...t: TypeChecker[]) => {
-	const check = mainT(...t);
+T.spreadOf = (t: TypeChecker[], u?: TypeChecker) => {
+	return (value: unknown) => {
+		if (!Array.isArray(value)) return false;
+		if (value.length < t.length) return false;
+		const tail = value.slice(0, t.length);
+		if (!checkType(t, tail)) return false;
+		const head = value.slice(t.length);
+		if (u) for (const item of head) {
+			if (!checkType(u, item)) return false;
+		}
+		return true;
+	}
+}
+
+T.mapOf = (...t: TypeChecker[]) => {
+	const check = T(...t);
 	return (value: unknown) => {
 		if (!value) return false;
 		if (!(typeof value === "object")) return false;
@@ -111,9 +127,13 @@ mainT.mapOf = (...t: TypeChecker[]) => {
 		return true;
 	}
 }
-mainT.allOf = (...checkers: TypeChecker[]) => (value: unknown) => {
+T.allOf = (...checkers: TypeChecker[]) => (value: unknown) => {
 	for (const checker of checkers) {
 		if (!checkType(checker, value)) return false;
 	}
 	return true;
+}
+T.assert = (value: unknown, type: TypeChecker, errorMessage = "wrong data format") => {
+	if (!checkType(type, value)) throw new Error(errorMessage);
+	return value;
 }

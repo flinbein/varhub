@@ -207,3 +207,39 @@ test("T tuple", () => {
 	expect(isCorrectItem([1, new Date(), "any", "anyother"])).toBe(false);
 	expect(isCorrectItem([1, "invalid", "any"])).toBe(false);
 });
+
+test("T spread", () => {
+	const isCorrectItem = T.spreadOf([T.number, T.bool], T.string);
+	
+	expect(isCorrectItem([1])).toBe(false);
+	expect(isCorrectItem([1, 2])).toBe(false);
+	expect(isCorrectItem([1, true])).toBe(true);
+	expect(isCorrectItem([1, true, "foo"])).toBe(true);
+	expect(isCorrectItem([1, true, "foo", "bar"])).toBe(true);
+	expect(isCorrectItem([1, 2, "foo", "bar"])).toBe(false);
+	expect(isCorrectItem([1, true, "foo", 12])).toBe(false);
+});
+
+test("T spread with array", () => {
+	const isCorrectItem = T.spreadOf([T.oneOf("open", "close"), T.bool], T.string);
+	
+	expect(isCorrectItem(["open"])).toBe(false);
+	expect(isCorrectItem(["open", true])).toBe(true);
+	expect(isCorrectItem(["open", true, "ok", "foo"])).toBe(true);
+	expect(isCorrectItem(["close", false, "ok", "foo"])).toBe(true);
+	expect(isCorrectItem(["ERROR", true, "ok", "foo"])).toBe(false);
+	expect(isCorrectItem(["ERROR", true, "ok", "foo"])).toBe(false);
+	expect(isCorrectItem(["close", false, "ok", 12])).toBe(false);
+});
+
+test("T spread any", () => {
+	const isCorrectItem = T.spreadOf([T.number, T.bool]);
+	
+	expect(isCorrectItem([1])).toBe(false);
+	expect(isCorrectItem([1, 3])).toBe(false);
+	expect(isCorrectItem([1, true])).toBe(true);
+	expect(isCorrectItem([1, true, 3])).toBe(true);
+	expect(isCorrectItem([1, true, "foo", "bar"])).toBe(true);
+	expect(isCorrectItem([1, 2, "foo", "bar"])).toBe(false);
+	expect(isCorrectItem([1, true, "foo", 12])).toBe(true);
+});

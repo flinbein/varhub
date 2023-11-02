@@ -1,71 +1,56 @@
-import { WebSocket } from "ws";
 import { VarHubServer } from "./VarHubServer.js";
-import { Buffer } from "buffer";
-import {
-	EventPackageType,
-	InPackage,
-	OutEventPackage,
-	OutPackageType,
-	OutResponsePackage
-} from "./utils/Package.js";
 import { TypeEmitter } from "./utils/TypedEmitter.js";
 
+export interface RegisterClientHandler {
+	(
+		call: (...data: any) => any,
+		exit: () => void
+	): {
+		sendEvent: (...data: any) => void,
+		disconnect: () => void
+	}
+}
 export class VarHubClient extends TypeEmitter {
 	
+	#clientHandler: ReturnType<RegisterClientHandler>;
+	#onExitHook: (client: VarHubClient) => void
+	#onCallHook: (client: VarHubClient, ...data: any) => any
+	#connected = true;
+	
 	constructor(
-		private readonly connection: WebSocket,
-		private readonly server: VarHubServer
+		private readonly server: VarHubServer,
+		register: RegisterClientHandler,
+		onExit: (client: VarHubClient) => void,
+		onMessage: (client: VarHubClient, ...data: any) => any
 	) {
 		super();
-		connection.on("message", async (data: Buffer) => {
-			const inPackage = InPackage.fromBytes(data);
-			try {
-				let result = this.server.handleInPackage(this, inPackage);
-				await this.sendResponse(inPackage.id, result);
-			} catch (e) {
-				try {
-					if (e instanceof Error) {
-						await this.sendError(inPackage.id, JSON.stringify({name: e.name, message: e.message}));
-					} else {
-						await this.sendError(inPackage.id, JSON.stringify(e));
-					}
-				} catch (e2) {
-					await this.sendError(inPackage.id);
-				}
-			}
-			
-		});
-		connection.on("error", (err: any) => {
-			this.close(4001, "unknown error: " + String(err));
-		});
+		this.#clientHandler = register(this.#onCall, this.#onExit);
+		this.#onExitHook = onExit;
+		this.#onCallHook = onMessage;
 	}
 	
-	close(code: number, message: string) {
-		this.connection.close(code, message);
+	get connected(): boolean {
+		return this.#connected
 	}
 	
-	private async send(...args: (string | Buffer)[]): Promise<void> {
-		return new Promise((resolve, reject) => {
-			const buffers = args.map(v => typeof v === "string" ? Buffer.from(v, "utf-8") : v);
-			this.connection.send(Buffer.concat(buffers), err => err ? reject(err) : resolve());
-		});
+	#onCall = (...data: any): any => {
+		if (!this.#connected) return;
+		return this.#onCallHook(this, ...data);
 	}
 	
-	protected async sendResponse(packetId: number, data: Buffer | string | ArrayBufferView = Buffer.alloc(0)) {
-		if (typeof data === "string") data = Buffer.from(data);
-		else if (ArrayBuffer.isView(data)) data = Buffer.from(data.buffer);
-		return await this.send(new OutResponsePackage(OutPackageType.SUCCESS, packetId, data as Buffer).getBytes());
+	#onExit = () => {
+		if (!this.#connected) return;
+		this.#onExitHook(this);
 	}
 	
-	protected async sendError(packetId: number, data: Buffer | string | ArrayBufferView = Buffer.alloc(0)) {
-		if (typeof data === "string") data = Buffer.from(data);
-		else if (ArrayBuffer.isView(data)) data = Buffer.from(data.buffer);
-		return await this.send(new OutResponsePackage(OutPackageType.ERROR, packetId, data as Buffer).getBytes());
+	sendEvent(...data: any){
+		this.#clientHandler.sendEvent(data);
 	}
 	
-	public async sendEvent(type: EventPackageType, data: Buffer | string | ArrayBufferView = Buffer.alloc(0)) {
-		if (typeof data === "string") data = Buffer.from(data);
-		else if (ArrayBuffer.isView(data)) data = Buffer.from(data.buffer);
-		return await this.send(new OutEventPackage(type, data as Buffer).getBytes());
+	exit(){
+		this.#connected = false;
+		this.#clientHandler.disconnect();
+		this.#onExitHook(this);
 	}
+	
 }
