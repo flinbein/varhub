@@ -161,6 +161,56 @@ describe('object', function () {
 	});
 })
 
+describe('error', function () {
+	test("simple", () => {
+		const source = new Error("msg");
+		const result = parse(serialize(source))[0] as typeof source;
+		expect(typeof result).toBe("object");
+		expect(result).toBeInstanceOf(Error);
+		expect(result.name).toBe("Error");
+		expect(result.message).toBe("msg");
+		expect(typeof result.stack).toBe("string");
+		expect(result).not.toHaveProperty("cause");
+	});
+	
+	test("with cause", () => {
+		const cause = new Error("cs");
+		const source = new Error("msg", {cause: cause});
+		const result = parse(serialize(source))[0] as typeof source;
+		expect(typeof result).toBe("object");
+		expect(result).toBeInstanceOf(Error);
+		expect(result.name).toBe("Error");
+		expect(result.message).toBe("msg");
+		expect(typeof result.stack).toBe("string");
+		expect(result).toHaveProperty("cause");
+		const resultCause = result?.cause as any;
+		expect(typeof resultCause).toBe("object");
+		expect(resultCause).toBeInstanceOf(Error);
+		expect(resultCause?.name).toBe("Error");
+		expect(resultCause?.message).toBe("cs");
+		expect(typeof resultCause?.stack).toBe("string");
+	});
+	
+	test("with custom cause", () => {
+		const cause = [new Error("cs")];
+		const source = new Error("msg", {cause: cause});
+		const result = parse(serialize(source))[0] as typeof source;
+		expect(typeof result).toBe("object");
+		expect(result).toBeInstanceOf(Error);
+		expect(result.name).toBe("Error");
+		expect(result.message).toBe("msg");
+		expect(typeof result.stack).toBe("string");
+		expect(result).toHaveProperty("cause");
+		const resultCause = result?.cause as any;
+		expect(Array.isArray(resultCause)).toBeTruthy();
+		expect(resultCause).toBeInstanceOf(Array);
+		expect(resultCause.length).toBe(1);
+		expect(resultCause[0].name).toBe("Error");
+		expect(resultCause[0].message).toBe("cs");
+		expect(typeof resultCause[0].stack).toBe("string");
+	});
+})
+
 describe('multi-value', function () {
 	test("parse values", () => {
 		const a = 4 as const;

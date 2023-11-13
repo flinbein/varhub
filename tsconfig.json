@@ -3,6 +3,7 @@
 	"compilerOptions": {
         "experimentalDecorators": true,
 		"target": "ESNext",
+		"lib": ["ESNext"],
 		"module": "NodeNext",
 		"moduleResolution": "NodeNext",
 		"outDir": "./dist",
@@ -21,6 +22,7 @@
 		"verbose": true
 	},
 	"exclude": [
+		"./node_modules/**/*",
 		"**/*/__test__/**/*",
 		"**/*/__tests__/**/*"
 	]

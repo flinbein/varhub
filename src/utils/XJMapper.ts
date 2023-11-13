@@ -1,5 +1,5 @@
 import { Buffer } from "buffer";
-import { SyncBufferReader } from "../varhub/controller/stateManager/SyncBufferReader.js";
+import { SyncBufferReader } from "./SyncBufferReader.js";
 
 export type XJPrimitive =
 	| null /*00*/ | boolean /*01,02*/ | number /*03 or 0xf_*/ | bigint /*04*/ | string /*05*/
@@ -10,7 +10,7 @@ export type XJPrimitive =
 export type XJArray = readonly XJData[]  /*12*/
 export type XJRecord = { readonly [key: string]: XJData }  /*13*/
 
-export type XJData = XJPrimitive | XJArray | XJRecord;
+export type XJData = Error /*14*/ | XJPrimitive | XJArray | XJRecord;
 
 export function serialize(...val: XJData[]): Buffer {
 	return Buffer.concat(val.flatMap(data => _serialize(data)));
@@ -56,6 +56,23 @@ function _serialize(val: XJData, pool?: Set<any>): Buffer[] {
 		Buffer.from((Uint32Array.of(val.length)).buffer),
 		...val.flatMap(item => _serialize(item, new Set(pool).add(val)))
 	];
+	if (val instanceof Error) {
+		const [/*ignored_type*/, ...dataName] = _serialize(String(val.name));
+		const [/*ignored_type*/, ...dataMessage] = _serialize(String(val.message));
+		const [/*ignored_type*/, ...dataStack] = _serialize(String(val.stack));
+		let causeData = [Buffer.of(0x00)]
+		if (val.cause !== undefined) try {
+			const causeSerialized = _serialize(val.cause as any);
+			causeData = [Buffer.of(0x01), ...causeSerialized];
+		} catch {}
+		return [
+			Buffer.of(0x14),
+			...dataName,
+			...dataMessage,
+			...dataStack,
+			...causeData
+		];
+	}
 	if (typeof val === "object") {
 		const names = Object.getOwnPropertyNames(val).sort();
 		const closedVal = val as XJRecord;
@@ -105,6 +122,23 @@ function _parse(data: SyncBufferReader, type?: number|null): XJData {
 		while (size --> 0) Object.defineProperty(result, _parse(data, 0x05) as string, {
 			value: _parse(data)
 		})
+		return result;
+	}
+	if (type === 0x14 /*Error*/ ) {
+		const name = data.readUintSizeAndBuffer().toString("utf-8");
+		const message = data.readUintSizeAndBuffer().toString("utf-8");
+		const stack = data.readUintSizeAndBuffer().toString("utf-8");
+		
+		const hasCause = data.readUInt8();
+		let result: Error;
+		if (!hasCause) {
+			result = new Error(message);
+		} else {
+			const cause = _parse(data);
+			result = new Error(message, {cause});
+		}
+		result.name = name;
+		result.stack = stack;
 		return result;
 	}
 	if (type >= 0xf0 && type <= 0xff) return type - 0xf0; // small integers

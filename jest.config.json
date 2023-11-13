@@ -5,5 +5,13 @@
 	"moduleNameMapper": {
 		"^(.*).[mc]?js$": "$1"
 	},
-	"roots": ["src"]
+	"roots": ["src"],
+	"transformIgnorePatterns": [
+		"<rootDir>/node_modules/",
+		"//node_modules",
+		"node_modules/.*"
+	],
+	"transform": {
+		"^.+\\.ts?$": "ts-jest"
+	}
 }

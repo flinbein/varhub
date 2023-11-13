@@ -9,6 +9,22 @@ test("T.any", () => {
 	expect(isAny("")).toBe(true);
 	expect(isAny("str")).toBe(true);
 	expect(isAny(4)).toBe(true);
+	expect(isAny.optional(4)).toBe(true);
+	expect(isAny.optional(undefined)).toBe(true);
+});
+
+test("T empty", () => {
+	const isNever = T();
+	expect(isNever(undefined)).toBe(false);
+	expect(isNever(null)).toBe(false);
+	expect(isNever(true)).toBe(false);
+	expect(isNever(true)).toBe(false);
+	expect(isNever(false)).toBe(false);
+	expect(isNever("")).toBe(false);
+	expect(isNever({x:1})).toBe(false);
+	expect(isNever(4)).toBe(false);
+	expect(isNever.optional(4)).toBe(false);
+	expect(isNever.optional(undefined)).toBe(true);
 });
 
 test("T.bool", () => {
@@ -18,6 +34,9 @@ test("T.bool", () => {
 	expect(isBoolean("")).toBe(false);
 	expect(isBoolean("str")).toBe(false);
 	expect(isBoolean(4)).toBe(false);
+	expect(isBoolean.optional(true)).toBe(true);
+	expect(isBoolean.optional(2)).toBe(false);
+	expect(isBoolean.optional(undefined)).toBe(true);
 });
 
 test("T.number", () => {
@@ -30,6 +49,9 @@ test("T.number", () => {
 	expect(isNumber(0)).toBe(true);
 	expect(isNumber(NaN)).toBe(true);
 	expect(isNumber(0.21)).toBe(true);
+	expect(isNumber.optional(0.21)).toBe(true);
+	expect(isNumber.optional(null)).toBe(false);
+	expect(isNumber.optional(undefined)).toBe(true);
 });
 
 test("T.int", () => {
@@ -42,6 +64,9 @@ test("T.int", () => {
 	expect(isInt(0)).toBe(true);
 	expect(isInt(NaN)).toBe(false);
 	expect(isInt(0.21)).toBe(false);
+	expect(isInt.optional(0.21)).toBe(false);
+	expect(isInt.optional(4)).toBe(true);
+	expect(isInt.optional(undefined)).toBe(true);
 });
 
 test("T string", () => {
@@ -52,6 +77,9 @@ test("T string", () => {
 	expect(isString("2")).toBe(true);
 	expect(isString(4)).toBe(false);
 	expect(isString(undefined)).toBe(false);
+	expect(isString.optional("x")).toBe(true);
+	expect(isString.optional(null)).toBe(false);
+	expect(isString.optional(undefined)).toBe(true);
 });
 
 test("T.optional string", () => {
@@ -89,6 +117,9 @@ test("T.arrayOf 1,2,3", () => {
 	expect(isArrayOf123([])).toBe(true);
 	expect(isArrayOf123([1,2,4])).toBe(false);
 	expect(isArrayOf123(["3"])).toBe(false);
+	expect(isArrayOf123.optional(["3"])).toBe(false);
+	expect(isArrayOf123.optional([1,2,3])).toBe(true);
+	expect(isArrayOf123.optional(undefined)).toBe(true);
 });
 
 test("T.mapOf of 1,2,3", () => {
@@ -105,6 +136,42 @@ test("T.mapOf of 1,2,3", () => {
 	expect(isMapOf123({})).toBe(true);
 	expect(isMapOf123({a: 1, b:2, c: 3, d: 3})).toBe(true);
 	expect(isMapOf123({a: 1, b:2, c: 3, d: 0})).toBe(false);
+	expect(isMapOf123.optional({a: 1, b:2, c: 3, d: 3})).toBe(true);
+	expect(isMapOf123.optional(undefined)).toBe(true);
+	expect(isMapOf123({a: 1, b:2, c: 3, d: 0})).toBe(false);
+});
+
+test("T.objectPartOf", () => {
+	const isCorrectItem = T.objectPartOf({x: T.string, y: T.number}, T.bool);
+	
+	expect(isCorrectItem(true)).toBe(false);
+	expect(isCorrectItem({})).toBe(false);
+	expect(isCorrectItem({x: "a"})).toBe(false);
+	expect(isCorrectItem({y: 1})).toBe(false);
+	expect(isCorrectItem({x: "a", y: 1})).toBe(true);
+	
+	expect(isCorrectItem({x: "a", y: 1, z: true})).toBe(true);
+	expect(isCorrectItem({x: "a", y: true, z: true})).toBe(false);
+	expect(isCorrectItem({x: "a", y: 1, z: true, m: 1})).toBe(false);
+	expect(isCorrectItem({x: "a", y: 1, m: 1})).toBe(false);
+	expect(isCorrectItem.optional({x: "a", y: 1, z: true})).toBe(true);
+	expect(isCorrectItem.optional(undefined)).toBe(true);
+	expect(isCorrectItem.optional({x: "a", y: 1, m: 1})).toBe(false);
+});
+
+test("T.objectPartOf any", () => {
+	const isCorrectItem = T.objectPartOf({x: T.string, y: T.number});
+	
+	expect(isCorrectItem(false)).toBe(false);
+	expect(isCorrectItem({})).toBe(false);
+	expect(isCorrectItem({x: "a", y: 1})).toBe(true);
+	expect(isCorrectItem({y: 1})).toBe(false);
+	expect(isCorrectItem({x: "a"})).toBe(false);
+	
+	expect(isCorrectItem({x: "a", y: 1, z: true})).toBe(true);
+	expect(isCorrectItem({x: "a", y: true, z: true})).toBe(false);
+	expect(isCorrectItem({x: "a", y: 1, z: true, m: 1})).toBe(true);
+	expect(isCorrectItem({x: "a", y: 1, m: 1})).toBe(true);
 });
 
 test("T.allOf", () => {
@@ -118,22 +185,9 @@ test("T.allOf", () => {
 	expect(isValidObject({x: 0})).toBe(false);
 	expect(isValidObject({y: ""})).toBe(false);
 	expect(isValidObject({x: "", y: 0})).toBe(false);
-});
-
-test("T with primitives", () => {
-	const isMapOf123 = T.mapOf(1, 2, 3);
-	
-	expect(isMapOf123(true)).toBe(false);
-	expect(isMapOf123(null)).toBe(false);
-	expect(isMapOf123(4)).toBe(false);
-	expect(isMapOf123(undefined)).toBe(false);
-	expect(isMapOf123("")).toBe(false);
-	
-	expect(isMapOf123([1,2,3])).toBe(false);
-	expect(isMapOf123([])).toBe(false);
-	expect(isMapOf123({})).toBe(true);
-	expect(isMapOf123({a: 1, b:2, c: 3, d: 3})).toBe(true);
-	expect(isMapOf123({a: 1, b:2, c: 3, d: 0})).toBe(false);
+	expect(isValidObject.optional({x: "", y: 0})).toBe(false);
+	expect(isValidObject.optional({x: 0, y: "", z: true})).toBe(true);
+	expect(isValidObject.optional(undefined)).toBe(true);
 });
 
 test("T any of type", () => {
@@ -144,6 +198,9 @@ test("T any of type", () => {
 	expect(isBooleanOrString("")).toBe(true);
 	expect(isBooleanOrString("str")).toBe(true);
 	expect(isBooleanOrString(4)).toBe(false);
+	expect(isBooleanOrString.optional(4)).toBe(false);
+	expect(isBooleanOrString.optional("str")).toBe(true);
+	expect(isBooleanOrString.optional(undefined)).toBe(true);
 });
 
 test("T custom", () => {
@@ -209,7 +266,7 @@ test("T tuple", () => {
 });
 
 test("T spread", () => {
-	const isCorrectItem = T.spreadOf([T.number, T.bool], T.string);
+	const isCorrectItem = T.listPartOf([T.number, T.bool], T.string);
 	
 	expect(isCorrectItem([1])).toBe(false);
 	expect(isCorrectItem([1, 2])).toBe(false);
@@ -218,10 +275,25 @@ test("T spread", () => {
 	expect(isCorrectItem([1, true, "foo", "bar"])).toBe(true);
 	expect(isCorrectItem([1, 2, "foo", "bar"])).toBe(false);
 	expect(isCorrectItem([1, true, "foo", 12])).toBe(false);
+	expect(isCorrectItem.optional([1, true, "foo", 12])).toBe(false);
+	expect(isCorrectItem.optional([1, true, "foo", "bar"])).toBe(true);
+	expect(isCorrectItem.optional(undefined)).toBe(true);
+});
+
+test("T instanceOf", () => {
+	const isCorrectItem = T.instanceOf(Promise, Date);
+	
+	expect(isCorrectItem(new Date(1))).toBe(true);
+	expect(isCorrectItem(Promise.resolve(1))).toBe(true);
+	expect(isCorrectItem(1)).toBe(false);
+	expect(isCorrectItem([2])).toBe(false);
+	expect(isCorrectItem.optional(Promise.resolve(1))).toBe(true);
+	expect(isCorrectItem.optional([2])).toBe(false);
+	expect(isCorrectItem.optional(undefined)).toBe(true);
 });
 
 test("T spread with array", () => {
-	const isCorrectItem = T.spreadOf([T.oneOf("open", "close"), T.bool], T.string);
+	const isCorrectItem = T.listPartOf([T.oneOf("open", "close"), T.bool], T.string);
 	
 	expect(isCorrectItem(["open"])).toBe(false);
 	expect(isCorrectItem(["open", true])).toBe(true);
@@ -230,10 +302,13 @@ test("T spread with array", () => {
 	expect(isCorrectItem(["ERROR", true, "ok", "foo"])).toBe(false);
 	expect(isCorrectItem(["ERROR", true, "ok", "foo"])).toBe(false);
 	expect(isCorrectItem(["close", false, "ok", 12])).toBe(false);
+	expect(isCorrectItem.optional(["close", false, "ok", "foo"])).toBe(true);
+	expect(isCorrectItem.optional(["ERROR", false, "ok", "foo"])).toBe(false);
+	expect(isCorrectItem.optional(undefined)).toBe(true);
 });
 
 test("T spread any", () => {
-	const isCorrectItem = T.spreadOf([T.number, T.bool]);
+	const isCorrectItem = T.listPartOf([T.number, T.bool]);
 	
 	expect(isCorrectItem([1])).toBe(false);
 	expect(isCorrectItem([1, 3])).toBe(false);
@@ -242,4 +317,47 @@ test("T spread any", () => {
 	expect(isCorrectItem([1, true, "foo", "bar"])).toBe(true);
 	expect(isCorrectItem([1, 2, "foo", "bar"])).toBe(false);
 	expect(isCorrectItem([1, true, "foo", 12])).toBe(true);
+});
+
+test("T assertions", () => {
+	const testDate = new Date();
+	const xyMap = {x:1, y: true};
+	const numArr = [1,2,3];
+	
+	expect(T.string.assert("x")).toBe("x");
+	expect(T.number.assert(2.2)).toBe(2.2);
+	expect(T.int.assert(2)).toBe(2);
+	expect(T.any.assert([1,2])).toEqual([1,2]);
+	expect(T.bool.assert(true)).toBe(true);
+	expect(T.instanceOf(Date).assert(testDate)).toBe(testDate);
+	expect(T.optionalOf(2).assert(undefined)).toBe(undefined);
+	expect(T.optionalOf(2).assert(2)).toBe(2);
+	expect(T.allOf(T.number, T.int).assert(2)).toBe(2);
+	expect(T.oneOf(T.number, T.string).assert("x")).toBe("x");
+	expect(T.oneOf(T.number, T.string).assert(2)).toBe(2);
+	expect(T.arrayOf(T.number).assert(numArr)).toBe(numArr);
+	expect(T.mapOf(T.number, T.bool).assert(xyMap)).toBe(xyMap);
+	expect(T.objectPartOf({x: T.number}, T.bool).assert(xyMap)).toBe(xyMap);
+	expect(T.listPartOf([1], T.number).assert(numArr)).toBe(numArr);
+	expect(T.listPartOf([1], T.number).optional.assert(numArr)).toBe(numArr);
+	expect(T.listPartOf([1], T.number).optional.assert(undefined)).toBe(undefined);
+});
+
+test("T negative assertions", () => {
+	const expectedError =new Error("wrong data format");
+	
+	expect(() => T.string.assert(4)).toThrow(expectedError);
+	expect(() => T.number.assert("x")).toThrow(expectedError);
+	expect(() => T.int.assert(true)).toThrow(expectedError);
+	expect(() => T.bool.assert(3)).toThrow(expectedError);
+	expect(() => T.instanceOf(Date).assert(12)).toThrow(expectedError);
+	expect(() => T.optionalOf(2).assert(3)).toThrow(expectedError);
+	expect(() => T.allOf(T.number, T.int).assert(12.2)).toThrow(expectedError);
+	expect(() => T.oneOf(T.number, T.string).assert(false)).toThrow(expectedError);
+	expect(() => T.arrayOf(T.int).assert([1,2,3,4.4])).toThrow(expectedError);
+	expect(() => T.mapOf(T.number, T.bool).assert({x: 1, y: true, z: "er"})).toThrow(expectedError);
+	expect(() => T.objectPartOf({x: T.number}, T.bool).assert({x: 1, y: 2})).toThrow(expectedError);
+	expect(() => T.listPartOf([1], T.number).assert([2,3])).toThrow(expectedError);
+	
+	expect(() => T.string.assert(4, "fooBar")).toThrow(new Error("fooBar"));
 });
