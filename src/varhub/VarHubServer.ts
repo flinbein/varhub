@@ -1,16 +1,9 @@
-import T from "../utils/TypeCheck.js";
-import { Room } from "./Room.js";
-//import { RegisterClientHandler, VarHubClient } from "./VarHubClient.js";
+import T from "t-type-check";
+import { Room, isRoomInitData } from "./Room.js";
 
 const isRoomCreateData = T({
-	modules: T.mapOf({
-		source: T.optionalOf(T.string),
-		url: T.optionalOf(T.string),
-		evaluate: T.bool
-	}),
-	pass: T.optionalOf(T.string),
-	adminPass: T.optionalOf(T.string)
-})
+	modules: isRoomInitData
+});
 
 const isCommandData = T.listPartOf([T("room","join","call")])
 
@@ -24,7 +17,7 @@ export interface CreateClient {
 		exit: () => void
 	): VarHubClient;
 }
-export class VarHubServer {
+export default class VarHubServer {
 	
 	readonly #clients = new Map<string, VarHubClient>();
 	readonly #rooms = new Map<string, Room|null>();
@@ -67,9 +60,10 @@ export class VarHubServer {
 			this.#rooms.set(id, null);
 			const onCloseHook = (reason: string) => this.#onCloseRoom(room, id, reason);
 			const onKickHook = (client: string, reason: string) => this.#onKick(room, id, client, reason);
-			const onEventHook = (clients: Iterable<string>, ...data: unknown[]) => this.#onRoomEvent(room, id, clients, data);
+			const onEventHook = (clients: Iterable<string>, ...data: unknown[]) => this.#onRoomEvent(room, id, clients, ...data);
 			const room = new Room(onEventHook, onKickHook, onCloseHook);
 			await room.init(roomData.modules);
+			this.#rooms.set(id, room);
 			return id;
 		} catch (e) {
 			this.#rooms.delete(id);
@@ -109,10 +103,14 @@ export class VarHubServer {
 		if (this.#clientToRoomIdMap.has(client)) throw new Error("already in room");
 		const [roomId, ...message] = T.listPartOf([T.string]).assert(args, "wrong `join` format");
 		const room = this.#rooms.get(roomId);
-		if (!room) throw new Error("wrong room id");
+		if (!room) throw new Error("wrong room id: "+ roomId);
 		this.#clientToRoomIdMap.set(client, null);
 		try {
 			const result = await room.addClient(clientId, ...message);
+			if (!result) {
+				this.#clientToRoomIdMap.delete(client);
+				return false;
+			}
 			this.#clientToRoomIdMap.set(client, roomId);
 			return result;
 		} catch (error) {

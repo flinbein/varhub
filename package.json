@@ -1,26 +1,27 @@
 {
   "name": "varhub",
   "node": ">=20.0.0",
+  "main": "./dist/index.mjs",
+  "module": "./dist/index.mjs",
   "packageManager": "yarn@4.0.0-rc.43",
   "type": "module",
   "dependencies": {
-    "sandboxer": "github:flinbein/sandboxer#v0.0.4",
-    "vm2": "^3.9.17",
-    "ws": "^8.13.0",
-    "yarn": "^1.22.19"
+    "sandboxer": "github:flinbein/sandboxer#0.0.9",
+    "xjmapper": "github:flinbein/xjmapper#1.0.1",
+    "t-type-check": "github:flinbein/t-type-check#1.0.0",
+    "ws": "^8.14.2"
   },
   "scripts": {
-    "build": "tsc",
-    "bundle": "ncc build src/index.mts --target es2022 --out dist",
-    "test": "jest"
+    "prepare": "tsc",
+    "test": "jest",
+    "start": "tsc && node ./dist/bin.js"
   },
+  "bin": "./dist/bin.js",
   "devDependencies": {
     "@tsconfig/node18": "^18.2.2",
     "@types/jest": "^29.5.8",
     "@types/node": "^20.9.0",
     "@types/ws": "^8.5.9",
-    "@vercel/ncc": "^0.38.1",
-    "@yarnpkg/pnpify": "^4.0.0",
     "jest": "^29.7.0",
     "ts-jest": "^29.1.1",
     "ts-node": "^10.9.1",

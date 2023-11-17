@@ -1,55 +1,89 @@
+// @ts-nocheck
 let hooks;
+export function init(sentHooks){
+	hooks = sentHooks;
+}
 export const target = new EventTarget;
 
-export const clients = new Set();
+export const clientMap = new Map();
+
+class Client {
+	#id;
+	#joinTime = performance.now();
+	get id(){
+		return this.#id
+	}
+	get online(){
+		return clientMap.has(this.#id);
+	}
+	get joinTime(){
+		return this.#joinTime
+	}
+	constructor(id) {
+		this.#id = id;
+	}
+	send(...msg){
+		send([this.#id], ...msg);
+	}
+	kick(message){
+		kick(this.#id, message);
+	}
+}
+
 class JoinEvent extends Event {
-	#clientId;
+	#client;
 	#messages;
-	get clientId() {return this.#clientId}
+	get client() {return this.#client}
+	get message() {return this.#messages[0]}
 	get messages() {return this.#messages}
-	constructor(clientId, ...messages) {
+	constructor(client, ...messages) {
 		super("join", {cancelable: true});
-		this.#clientId = clientId;
+		this.#client = client;
 		this.#messages = messages;
 	}
 }
 class LeaveEvent extends Event {
-	#clientId;
-	get clientId() {return this.#clientId}
-	constructor(clientId) {
-		super("leave", {cancelable: true});
-		this.#clientId = clientId;
+	#client;
+	get client() {return this.#client}
+	constructor(client) {
+		super("leave", {cancelable: false});
+		this.#client = client;
 	}
 }
-export function init(sentHooks){
-	hooks = sentHooks;
-}
 export function onJoin(clientId, ...messages){
-	const event = new JoinEvent(clientId, ...messages);
+	const client = new Client(clientId)
+	const event = new JoinEvent(client, ...messages);
 	target.dispatchEvent(event);
-	if (event.defaultPrevented) return false
-	clients.add(clientId);
-	return true;
+	if (event.defaultPrevented) return;
+	clientMap.set(clientId, client);
+	return client;
 }
 
-export function onLeave(clientId){
+export function onLeave(clientId, client){
 	clients.delete(clientId);
-	const event = new LeaveEvent(clientId);
+	const event = new LeaveEvent(client);
 	target.dispatchEvent(event);
 }
 
-export function kick(clientId, message){
+function kick(clientId, message){
 	if (!clients.has(clientId)) return false;
-	clients.delete(clientId);
-	hooks.kick.call(undefined, clientId, message);
+	clientMap.delete(clientId);
+	hooks.kick(clientId, message);
 	onLeave(clientId);
 	return true;
 }
 
-export function send(clientId, ...message){
-	hooks.send.call(undefined, clientId, ...message);
+export function send(clientIdList, ...message){
+	if (!Array.isArray(clientIdList)) clientIdList = [clientIdList];
+	clientIdList = clientIdList.map(clientInfo => clientInfo instanceof Client ? clientInfo.id : clientInfo);
+	hooks.send(clientIdList, ...message);
 }
+
+export function broadcast(...message){
+	hooks.send([...clientMap.keys()], ...message);
+}
+
 export function close(reason){
-	hooks.close.call(undefined, reason);
+	hooks.close(reason);
 }
 
