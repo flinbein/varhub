@@ -26,7 +26,7 @@ class Client {
 		send([this.#id], ...msg);
 	}
 	kick(message){
-		kick(this.#id, message);
+		return kick(this.#id, message);
 	}
 }
 
@@ -60,13 +60,13 @@ export function onJoin(clientId, ...messages){
 }
 
 export function onLeave(clientId, client){
-	clients.delete(clientId);
+	clientMap.delete(clientId);
 	const event = new LeaveEvent(client);
 	target.dispatchEvent(event);
 }
 
 function kick(clientId, message){
-	if (!clients.has(clientId)) return false;
+	if (!clientMap.has(clientId)) return false;
 	clientMap.delete(clientId);
 	hooks.kick(clientId, message);
 	onLeave(clientId);

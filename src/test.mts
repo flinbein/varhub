@@ -4,7 +4,7 @@ import assert from "node:assert";
 import { Room } from "./varhub/Room.js";
 
 describe("Room create", async () => {
-	const room = new Room(mock.fn(), mock.fn(), mock.fn());
+	const room = new Room(mock.fn(), mock.fn(), mock.fn(), {ttlOnEmpty: 10, ttlOnInit: 1000});
 	
 	await it("init-test", async () => {
 		void({
@@ -25,13 +25,13 @@ describe("Room create", async () => {
 					});
 					
 					export function getClients(){
-						console.log(this.clientId, "requests clients list");
-						return [...room.getClients()];
+						console.log(this.client.id, "requests clients list");
+						return [...room.getClients().map(s => s.id)];
 					}
 					
-					export function kick(name){
-						console.log(this.clientId, "call kick", name);
-						return room.kick(name);
+					export function kick(name, reason){
+						console.log(this.client.id, "call kick", name);
+						return room.getClientById(name)?.kick(reason) ?? false;
 					}
 					
 					export function getWrongData(){
@@ -53,9 +53,9 @@ describe("Room create", async () => {
 		});
 		
 		const time1 = await room.call("AndreyQ", "syncTime");
-		console.log("TIME1", time1);
 		const time2 = await room.call("AndreyQ", "syncTime");
-		console.log("TIME2", time2);
+		assert.notEqual(time1, time2);
+		
 		
 		const client1Connected = await room.addClient("AndreyQ", "roomPass", 12);
 		assert.equal(client1Connected, true);
@@ -89,6 +89,12 @@ describe("Room create", async () => {
 		
 		const resultClients3 = await room.call("AndreyQ", "getClients");
 		assert.deepEqual(resultClients3, ["AndreyQ"]);
-		console.log("END-TEST");
+		
+		for (const clientId of room.getClients()) {
+			room.removeClient(clientId);
+		}
+		
+		await new Promise(r => setTimeout(r, 50)); // wait 50ms, but ttlOnEmpty = 10ms
+		assert.equal(room.status, "closed");
 	})
 })
