@@ -1,10 +1,5 @@
 import T from "t-type-check";
-import { Room, isRoomInitData } from "./Room.js";
-
-const isRoomCreateData = T({
-	modules: isRoomInitData,
-	config: T.any
-});
+import { Room, isRoomCreateData } from "./Room.js";
 
 const isCommandData = T.listPartOf([T("room","join","call")])
 
@@ -63,7 +58,7 @@ export class VarHubServer {
 			const onKickHook = (client: string, reason: string) => this.#onKick(room, id, client, reason);
 			const onEventHook = (clients: Iterable<string>, ...data: unknown[]) => this.#onRoomEvent(room, id, clients, ...data);
 			const room = new Room(onEventHook, onKickHook, onCloseHook);
-			await room.init(roomData.modules, roomData.config);
+			await room.init(roomData);
 			this.#rooms.set(id, room);
 			return [id, room.hash];
 		} catch (e) {
@@ -101,11 +96,12 @@ export class VarHubServer {
 	}
 	
 	async joinRoom(client: VarHubClient, clientId: string, ...args: unknown[]){
-		const [roomId, hash,...message] = T.listPartOf([T.string, T(T.string, null)]).assert(args, "wrong `join` format");
+		const [roomId, integrityKey,...message] = T.listPartOf([T.string, T(T.string, null)]).assert(args, "wrong `join` format");
 		if (this.#clientToRoomIdMap.has(client)) throw new Error("already in room");
 		const room = this.#rooms.get(roomId);
 		if (!room) throw new Error("wrong room id: "+ roomId);
-		if (hash && room.hash !== hash) throw new Error("room hash mismatched");
+		if (!integrityKey && room.integrityRequired) throw new Error("room integrity key required");
+		if (integrityKey && room.hash !== integrityKey) throw new Error("room integrity key mismatched");
 		this.#clientToRoomIdMap.set(client, null);
 		try {
 			const result = await room.addClient(clientId, ...message);

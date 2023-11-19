@@ -32,9 +32,13 @@ const isRoomModule = T(isRoomJsModule, isRoomJsonModule);
 
 const isClientOrClientList = T(T.string,T.arrayOf(T.string));
 
-export const isRoomInitData = T.mapOf(isRoomModule);
+export const isRoomCreateData = T({
+	modules: T.mapOf(isRoomModule),
+	config: T.any,
+	integrityRequired: T.bool.optional
+});
 
-type RoomInitData = ResolveTypeChecker<typeof isRoomInitData>;
+type RoomCreateData = ResolveTypeChecker<typeof isRoomCreateData>;
 
 
 function asyncReadFile(modulePath: string, encoding: TranscodeEncoding){
@@ -70,9 +74,14 @@ export class Room {
 	#options: RoomOptions;
 	#status: RoomStatus = "new";
 	#hash: string|null = null;
+	#integrityRequired: boolean = false;
 	
 	get status(): RoomStatus{
 		return this.#status;
+	}
+	
+	get integrityRequired(): boolean{
+		return this.#integrityRequired;
 	}
 	
 	get hash(): string|null{
@@ -112,10 +121,10 @@ export class Room {
 		this.#aliases.set(alias, [module, functionName]);
 	}
 	
-	public async init(data: RoomInitData, config?: any){
+	public async init(data: RoomCreateData){
 		try {
 			this.#status = "init"
-			const result = await this._init(data, config);
+			const result = await this._init(data);
 			this.#status = "ready"
 			return result;
 		} catch (error) {
@@ -124,14 +133,14 @@ export class Room {
 		}
 	}
 	
-	public async _init(data: RoomInitData, config?: any){
-		const names = Object.keys(data);
+	public async _init({modules: moduleDescriptors, config, integrityRequired}: RoomCreateData){
+		const names = Object.keys(moduleDescriptors);
 		const hashObject = {modules: {}, alias: {}} as any;
 		if (names.some(name => name.startsWith("varhub:"))) throw new Error("forbidden module domain: `varhub:`")
 		const sandboxDescriptor: Parameters<typeof ModuleSandbox.create>[0] = {};
 		const roomModuleText = await roomTextPromise;
 		const innerModuleText = await innerTextPromise;
-		for (let [moduleName, moduleConfig] of Object.entries(data)) {
+		for (let [moduleName, moduleConfig] of Object.entries(moduleDescriptors)) {
 			if (!moduleConfig) continue;
 			if (moduleConfig.type === "json") {
 				sandboxDescriptor[moduleName] = {type: "json", source: moduleConfig.source}
@@ -192,6 +201,7 @@ export class Room {
 		const mappingOfInit = {mapping: "link", responseMapping: "ignore", hookMode: {mapping: "json", responseMapping: "ignore", noThis: true}} as const;
 		await this.#sandbox?.invoke("varhub:inner", "init", undefined, [hooks], mappingOfInit);
 		this.#hash = getStableHash(hashObject, "sha256", "hex");
+		this.#integrityRequired = Boolean(integrityRequired);
 		this.#setLifeToLive(this.#options.ttlOnInit);
 	}
 	
