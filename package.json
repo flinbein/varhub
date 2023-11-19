@@ -2,8 +2,8 @@
   "name": "varhub",
   "version": "1.0.10",
   "node": ">=20.0.0",
-  "main": "./dist/index.mjs",
-  "module": "./dist/index.mjs",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
   "packageManager": "yarn@4.0.0-rc.43",
   "type": "module",
   "dependencies": {
