@@ -1,6 +1,6 @@
 {
   "name": "varhub",
-  "version": "1.0.7",
+  "version": "1.0.8",
   "node": ">=20.0.0",
   "main": "./dist/index.mjs",
   "module": "./dist/index.mjs",
