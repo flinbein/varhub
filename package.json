@@ -1,23 +1,18 @@
 {
   "name": "varhub",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "node": ">=20.0.0",
   "main": "./dist/index.mjs",
   "module": "./dist/index.mjs",
   "packageManager": "yarn@4.0.0-rc.43",
   "type": "module",
   "dependencies": {
-    "sandboxer": "git+https://github.com/flinbein/sandboxer#0.1.1",
-    "xjmapper": "git+https://github.com/flinbein/xjmapper#1.0.2",
-    "t-type-check": "git+https://github.com/flinbein/t-type-check#1.0.0",
-    "ws": "^8.14.2"
+    "t-type-check": "git+https://github.com/flinbein/t-type-check#1.0.0"
   },
   "scripts": {
-    "prepare": "tsc",
-    "test": "jest",
-    "start": "tsc && node ./dist/bin.js"
+    "install": "tsc",
+    "test": "jest"
   },
-  "bin": "./dist/bin.js",
   "devDependencies": {
     "@tsconfig/node18": "^18.2.2",
     "@types/jest": "^29.5.8",
