@@ -1,9 +1,10 @@
-import {URL} from "node:url";
-import {readFile} from "node:fs";
+import { URL } from "node:url";
+import { readFile } from "node:fs";
 import ModuleSandbox from "sandboxer";
 import T, { ResolveTypeChecker } from "t-type-check";
 
 import type { TranscodeEncoding } from "node:buffer";
+import { getStableHash } from "../utils/getStableHash.js";
 
 const roomTextPromise = asyncReadFile("./controller/$room.js", "utf-8");
 const innerTextPromise = asyncReadFile("./controller/$inner.js", "utf-8");
@@ -14,7 +15,7 @@ const innerModulesAsync: Record<string, Promise<string>> = {
 
 const isInvokeArgs = T.listPartOf([T.string]);
 
-const isRoomModule = T({
+const isRoomJsModule = T({
 	type: "js",
 	source: T.string.optional,
 	evaluate: T.bool.optional,
@@ -23,6 +24,11 @@ const isRoomModule = T({
 		T.arrayOf(T.string)
 	).optional
 })
+const isRoomJsonModule = T({
+	type: "json",
+	source: T.string,
+})
+const isRoomModule = T(isRoomJsModule, isRoomJsonModule);
 
 const isClientOrClientList = T(T.string,T.arrayOf(T.string));
 
@@ -63,9 +69,14 @@ export class Room {
 	#lifeTimer: null|ReturnType<typeof setTimeout> = null
 	#options: RoomOptions;
 	#status: RoomStatus = "new";
+	#hash: string|null = null;
 	
 	get status(): RoomStatus{
 		return this.#status;
+	}
+	
+	get hash(): string|null{
+		return this.#hash;
 	}
 	
 	#setLifeToLive(ttl: number){
@@ -101,10 +112,10 @@ export class Room {
 		this.#aliases.set(alias, [module, functionName]);
 	}
 	
-	public async init(data: RoomInitData){
+	public async init(data: RoomInitData, config?: any){
 		try {
 			this.#status = "init"
-			const result = await this._init(data);
+			const result = await this._init(data, config);
 			this.#status = "ready"
 			return result;
 		} catch (error) {
@@ -113,39 +124,62 @@ export class Room {
 		}
 	}
 	
-	public async _init(data: RoomInitData){
+	public async _init(data: RoomInitData, config?: any){
 		const names = Object.keys(data);
+		const hashObject = {modules: {}, alias: {}} as any;
 		if (names.some(name => name.startsWith("varhub:"))) throw new Error("forbidden module domain: `varhub:`")
 		const sandboxDescriptor: Parameters<typeof ModuleSandbox.create>[0] = {};
 		const roomModuleText = await roomTextPromise;
 		const innerModuleText = await innerTextPromise;
 		for (let [moduleName, moduleConfig] of Object.entries(data)) {
+			if (!moduleConfig) continue;
+			if (moduleConfig.type === "json") {
+				sandboxDescriptor[moduleName] = {type: "json", source: moduleConfig.source}
+				hashObject.modules[moduleName] = ["json", moduleConfig.source];
+				continue;
+			}
 			if (moduleName in innerModulesAsync) {
 				if (moduleConfig?.source) throw new Error("overriding inner module: "+moduleName);
 				const source = await innerModulesAsync[moduleName];
-				sandboxDescriptor[moduleName] = {source, links: ["varhub:room"], evaluate: moduleConfig?.evaluate}
+				sandboxDescriptor[moduleName] = {type: "js", source, links: ["varhub:room", "varhub:config"], evaluate: Boolean(moduleConfig?.evaluate)}
+				hashObject.modules[moduleName] = ["js", source, Boolean(moduleConfig?.evaluate)]
 			} else {
 				const source = moduleConfig?.source ?? "";
 				if (!source) throw new Error("empty module: "+moduleName);
-				sandboxDescriptor[moduleName] = {source, links: [...names, "varhub:room"], evaluate: moduleConfig?.evaluate}
+				sandboxDescriptor[moduleName] = {type: "js", source, links: [...names, "varhub:room", "varhub:config"], evaluate: moduleConfig?.evaluate}
+				hashObject[moduleName] = ["js", source, Boolean(moduleConfig?.evaluate)]
 			}
 			
 			if (moduleConfig?.hooks) {
 				if (Array.isArray(moduleConfig?.hooks)) {
 					for (const alias of moduleConfig.hooks) {
 						this.#registerAlias(alias, moduleName, alias);
+						hashObject.alias[alias] = [moduleName, alias];
 					}
 				} else {
 					for (const [alias, functionName] of Object.entries(moduleConfig.hooks)) {
-						if (functionName === true) this.#registerAlias(alias, moduleName, alias);
-						else if (typeof functionName === "string") this.#registerAlias(alias, moduleName, functionName);
+						if (functionName === true) {
+							this.#registerAlias(alias, moduleName, alias);
+							hashObject.alias[alias] = [moduleName, alias];
+						}
+						else if (typeof functionName === "string") {
+							this.#registerAlias(alias, moduleName, functionName);
+							hashObject.alias[alias] = [moduleName, functionName];
+						}
 					}
 				}
 			}
 		}
-		sandboxDescriptor["varhub:room"] = {source: roomModuleText, links: ["varhub:inner"]};
-		sandboxDescriptor["varhub:inner"] = {source: innerModuleText, links: [], evaluate: true};
-		this.#sandbox = await ModuleSandbox.create(sandboxDescriptor, {stdout: 1, stderr: 2});
+		if (config !== undefined) {
+			sandboxDescriptor["varhub:config"] = {type: "json", source: JSON.stringify(config)}
+		}
+		sandboxDescriptor["varhub:room"] = {type: "js", source: roomModuleText, links: ["varhub:inner"]};
+		sandboxDescriptor["varhub:inner"] = {type: "js", source: innerModuleText, links: [], evaluate: true};
+		this.#sandbox = await ModuleSandbox.create(sandboxDescriptor, {
+			stdout: 1,
+			stderr: 2,
+			contextHooks: ["console", "EventTarget", "Event", "performance"],
+		});
 		this.#sandbox?.once("exit", (reason) => this.close(reason));
 		
 		const hooks = {
@@ -157,16 +191,25 @@ export class Room {
 		}
 		const mappingOfInit = {mapping: "link", responseMapping: "ignore", hookMode: {mapping: "json", responseMapping: "ignore", noThis: true}} as const;
 		await this.#sandbox?.invoke("varhub:inner", "init", undefined, [hooks], mappingOfInit);
-		
+		this.#hash = getStableHash(hashObject, "sha256", "hex");
 		this.#setLifeToLive(this.#options.ttlOnInit);
 	}
 	
 	async addClient(clientId: string, ...message: unknown[]): Promise<unknown> {
-		this.#clearTimeToLive();
-		const result = await this.#sandbox?.invoke("varhub:inner", "onJoin", undefined, [clientId, ...message], {mapping: "process", responseMapping: "ref"});
-		if (!result) return false;
+		const remoteClientPromise = this.#sandbox!.invoke("varhub:inner", "onJoin", undefined, [clientId, ...message], {mapping: "process", responseMapping: "ref"});
+		let remoteClient;
+		try {
+			remoteClient = await remoteClientPromise;
+		} catch (eRef) {
+			throw await this.#sandbox?.invoke("varhub:inner", "deref", undefined, [eRef], {
+				mapping: "link",
+				responseMapping: "process"
+			});
+		}
+		if (!remoteClient) return false;
 		this.#clients.add(clientId);
-		this.#remoteClientIdMap.set(clientId, result);
+		this.#remoteClientIdMap.set(clientId, remoteClient);
+		this.#clearTimeToLive();
 		return true;
 	}
 	
@@ -191,6 +234,7 @@ export class Room {
 	}
 	
 	close(reason: string){
+		if (this.#status === "closed") return;
 		this.#status = "closed"
 		this.#clearTimeToLive();
 		this.#sandbox?.kill();

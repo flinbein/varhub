@@ -1,15 +1,15 @@
 {
   "name": "varhub",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "node": ">=20.0.0",
   "main": "./dist/index.mjs",
   "module": "./dist/index.mjs",
   "packageManager": "yarn@4.0.0-rc.43",
   "type": "module",
   "dependencies": {
-    "sandboxer": "github:flinbein/sandboxer#0.0.9",
-    "xjmapper": "github:flinbein/xjmapper#1.0.1",
-    "t-type-check": "github:flinbein/t-type-check#1.0.0",
+    "sandboxer": "git+https://github.com/flinbein/sandboxer#0.1.1",
+    "xjmapper": "git+https://github.com/flinbein/xjmapper#1.0.2",
+    "t-type-check": "git+https://github.com/flinbein/t-type-check#1.0.0",
     "ws": "^8.14.2"
   },
   "scripts": {

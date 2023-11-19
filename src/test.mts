@@ -41,8 +41,12 @@ describe("Room create", async () => {
 					export function throwError(message){
 						throw new Error(message);
 					}
+					
+					export function nope(){
+					
+					}
 				`,
-				hooks: ["getClients", "kick", "getWrongData", "throwError"]
+				hooks: ["getClients", "kick", "getWrongData", "throwError", "nope"]
 			},
 			"inner:timer": {
 				type: "js",
@@ -89,6 +93,9 @@ describe("Room create", async () => {
 		
 		const resultClients3 = await room.call("AndreyQ", "getClients");
 		assert.deepEqual(resultClients3, ["AndreyQ"]);
+		
+		const resultNope = await room.call("AndreyQ", "nope");
+		assert.equal(resultNope, undefined);
 		
 		for (const clientId of room.getClients()) {
 			room.removeClient(clientId);

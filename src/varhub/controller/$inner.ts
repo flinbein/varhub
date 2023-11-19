@@ -51,12 +51,18 @@ class LeaveEvent extends Event {
 	}
 }
 export function onJoin(clientId, ...messages){
-	const client = new Client(clientId)
-	const event = new JoinEvent(client, ...messages);
-	target.dispatchEvent(event);
-	if (event.defaultPrevented) return;
-	clientMap.set(clientId, client);
-	return client;
+	try {
+		const client = new Client(clientId)
+		const event = new JoinEvent(client, ...messages);
+		target.dispatchEvent(event);
+		if (event.defaultPrevented) return;
+		clientMap.set(clientId, client);
+		return client;
+	} catch (e) {
+		console.error(e);
+		throw e;
+	}
+	
 }
 
 export function onLeave(clientId, client){
@@ -85,5 +91,9 @@ export function broadcast(...message){
 
 export function close(reason){
 	hooks.close(reason);
+}
+
+export function deref(value){
+	return value;
 }
 
