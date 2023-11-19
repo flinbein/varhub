@@ -1,5 +1,5 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="test.mts" type="TypeScriptProgramRunner" factoryName="TypeScript">
+  <configuration default="false" name="test.ts" type="TypeScriptProgramRunner" factoryName="TypeScript">
     <module name="varhub" />
     <option name="interpreterRef" value="project" />
     <option name="enabledTsNodeEsmLoader" value="false" />
@@ -7,9 +7,11 @@
     <option name="workingDirectory" value="C:\PROJECTS\varhub\src" />
     <option name="tsconfigFile" value="C:\PROJECTS\varhub\tsconfig.json" />
     <option name="extraTypeScriptOptions" value="" />
-    <option name="scriptName" value="$PROJECT_DIR$/src/test.mts" />
+    <option name="scriptName" value="$PROJECT_DIR$/src/test.ts" />
     <option name="programParameters" value="" />
-    <option name="tsnodePackage" value="C:\PROJECTS\varhub\node_modules\ts-node" />
+    <method v="2" />
+  </configuration>
+  <configuration default="false" name="test.mts" type="NodeJSConfigurationType" node-parameters="--loader ts-node/esm" path-to-js-file="src/__tests__/test.ts" working-dir="$PROJECT_DIR$">
     <method v="2" />
   </configuration>
 </component>

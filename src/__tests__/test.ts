@@ -1,7 +1,7 @@
 import { describe, it, mock } from "node:test";
 import assert from "node:assert";
 
-import { Room } from "./varhub/Room.js";
+import { Room } from "../varhub/Room";
 
 describe("Room create", async () => {
 	const room = new Room(mock.fn(), mock.fn(), mock.fn(), {ttlOnEmpty: 10, ttlOnInit: 1000});
