@@ -1,1 +1,2 @@
-export * from "./varhub/VarHubServer.js"
+import { VarHubServer } from  "./varhub/VarHubServer.js"
+export default VarHubServer;

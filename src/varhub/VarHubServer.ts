@@ -18,7 +18,7 @@ export interface CreateClient {
 		exit: () => void
 	): VarHubClient;
 }
-export default class VarHubServer {
+export class VarHubServer {
 	
 	readonly #clients = new Map<string, VarHubClient>();
 	readonly #rooms = new Map<string, Room|null>();

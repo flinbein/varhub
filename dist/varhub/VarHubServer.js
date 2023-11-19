@@ -5,7 +5,7 @@ const isRoomCreateData = T({
     config: T.any
 });
 const isCommandData = T.listPartOf([T("room", "join", "call")]);
-export default class VarHubServer {
+export class VarHubServer {
     #clients = new Map();
     #rooms = new Map();
     #clientToRoomIdMap = new WeakMap();
