@@ -54,8 +54,8 @@ export class VarHubServer {
     }
     #onCloseRoom = async (room, id, reason) => {
         this.#rooms.delete(id);
-        for (let client of room.getClients()) {
-            this.#clients.get(id)?.disconnect(reason);
+        for (let clientId of room.getClients()) {
+            this.#clients.get(clientId)?.disconnect(reason);
         }
     };
     #onKick = async (room, roomId, clientId, reason) => {
