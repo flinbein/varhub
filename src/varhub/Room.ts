@@ -21,7 +21,8 @@ const isRoomJsModule = T({
 	evaluate: T.bool.optional,
 	hooks: T(
 		T.mapOf(T.string, T.bool),
-		T.arrayOf(T.string)
+		T.arrayOf(T.string),
+		"*"
 	).optional
 })
 const isRoomJsonModule = T({
@@ -34,7 +35,7 @@ const isClientOrClientList = T(T.string,T.arrayOf(T.string));
 
 export const isRoomCreateData = T({
 	modules: T.mapOf(isRoomModule),
-	config: T.any,
+	config: T.any.optional,
 	integrityRequired: T.bool.optional
 });
 
@@ -69,6 +70,7 @@ export class Room {
 	readonly #clients: Set<string> = new Set();
 	readonly #remoteClientIdMap: Map<string, unknown> = new Map();
 	readonly #aliases: Map<string, [string, string]> = new Map();
+	#starInvokeHandler: string|null = null;
 	#sandbox?: ModuleSandbox<string>;
 	#lifeTimer: null|ReturnType<typeof setTimeout> = null
 	#options: RoomOptions;
@@ -165,6 +167,12 @@ export class Room {
 						this.#registerAlias(alias, moduleName, alias);
 						hashObject.alias[alias] = [moduleName, alias];
 					}
+				} else if (moduleConfig?.hooks === "*") {
+					if (this.#starInvokeHandler != null) {
+						throw new Error(`alias * overlap: in ${module}, ${this.#starInvokeHandler}`);
+					}
+					this.#starInvokeHandler = moduleName;
+					hashObject.mainInvokeHandler = moduleName;
 				} else {
 					for (const [alias, functionName] of Object.entries(moduleConfig.hooks)) {
 						if (functionName === true) {
@@ -179,8 +187,10 @@ export class Room {
 				}
 			}
 		}
-		if (config !== undefined) {
-			sandboxDescriptor["varhub:config"] = {type: "json", source: JSON.stringify(config)}
+		if (config === undefined) {
+			sandboxDescriptor["varhub:config"] = {type: "js", source: "export default undefined"}
+		} else {
+			sandboxDescriptor["varhub:config"] = {type: "json", source: JSON.stringify(config)};
 		}
 		sandboxDescriptor["varhub:room"] = {type: "js", source: roomModuleText, links: ["varhub:inner"]};
 		sandboxDescriptor["varhub:inner"] = {type: "js", source: innerModuleText, links: [], evaluate: true};
@@ -236,8 +246,11 @@ export class Room {
 	
 	async call(clientId: string, ...args: unknown[]) {
 		const [alias, ...invokeArgs] = isInvokeArgs.assert(args, 'wrong call-module format');
-		const callbackPath = this.#aliases.get(alias);
-		if (!callbackPath) throw new Error("no registered function with this alias: "+alias);
+		let callbackPath = this.#aliases.get(alias);
+		if (!callbackPath) {
+			if (!this.#starInvokeHandler) throw new Error("no registered function with this alias: "+alias);
+			callbackPath = [this.#starInvokeHandler, alias];
+		}
 		const [moduleName, methodName] = callbackPath;
 		const client = this.#remoteClientIdMap.get(clientId);
 		return this.#sandbox?.invoke(moduleName, methodName, {client}, invokeArgs, {mapping: "link", responseMapping: "process"});

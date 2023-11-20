@@ -13,7 +13,7 @@ const isRoomJsModule = T({
     type: "js",
     source: T.string.optional,
     evaluate: T.bool.optional,
-    hooks: T(T.mapOf(T.string, T.bool), T.arrayOf(T.string)).optional
+    hooks: T(T.mapOf(T.string, T.bool), T.arrayOf(T.string), "*").optional
 });
 const isRoomJsonModule = T({
     type: "json",
@@ -23,7 +23,7 @@ const isRoomModule = T(isRoomJsModule, isRoomJsonModule);
 const isClientOrClientList = T(T.string, T.arrayOf(T.string));
 export const isRoomCreateData = T({
     modules: T.mapOf(isRoomModule),
-    config: T.any,
+    config: T.any.optional,
     integrityRequired: T.bool.optional
 });
 function asyncReadFile(modulePath, encoding) {
@@ -46,6 +46,7 @@ export class Room {
     #clients = new Set();
     #remoteClientIdMap = new Map();
     #aliases = new Map();
+    #starInvokeHandler = null;
     #sandbox;
     #lifeTimer = null;
     #options;
@@ -134,6 +135,13 @@ export class Room {
                         hashObject.alias[alias] = [moduleName, alias];
                     }
                 }
+                else if (moduleConfig?.hooks === "*") {
+                    if (this.#starInvokeHandler != null) {
+                        throw new Error(`alias * overlap: in ${module}, ${this.#starInvokeHandler}`);
+                    }
+                    this.#starInvokeHandler = moduleName;
+                    hashObject.mainInvokeHandler = moduleName;
+                }
                 else {
                     for (const [alias, functionName] of Object.entries(moduleConfig.hooks)) {
                         if (functionName === true) {
@@ -148,7 +156,10 @@ export class Room {
                 }
             }
         }
-        if (config !== undefined) {
+        if (config === undefined) {
+            sandboxDescriptor["varhub:config"] = { type: "js", source: "export default undefined" };
+        }
+        else {
             sandboxDescriptor["varhub:config"] = { type: "json", source: JSON.stringify(config) };
         }
         sandboxDescriptor["varhub:room"] = { type: "js", source: roomModuleText, links: ["varhub:inner"] };
@@ -204,9 +215,12 @@ export class Room {
     }
     async call(clientId, ...args) {
         const [alias, ...invokeArgs] = isInvokeArgs.assert(args, 'wrong call-module format');
-        const callbackPath = this.#aliases.get(alias);
-        if (!callbackPath)
-            throw new Error("no registered function with this alias: " + alias);
+        let callbackPath = this.#aliases.get(alias);
+        if (!callbackPath) {
+            if (!this.#starInvokeHandler)
+                throw new Error("no registered function with this alias: " + alias);
+            callbackPath = [this.#starInvokeHandler, alias];
+        }
         const [moduleName, methodName] = callbackPath;
         const client = this.#remoteClientIdMap.get(clientId);
         return this.#sandbox?.invoke(moduleName, methodName, { client }, invokeArgs, { mapping: "link", responseMapping: "process" });
