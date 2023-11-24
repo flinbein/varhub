@@ -43,6 +43,20 @@ function asyncReadFile(modulePath, encoding) {
         });
     });
 }
+function createDataLogger(logger, prefix = "") {
+    let buf = "";
+    return (data) => {
+        const dataStr = buf + data.toString();
+        const lines = dataStr.split("\n");
+        if (lines.length === 0)
+            return buf = dataStr;
+        buf = lines[lines.length - 1];
+        const displayLines = lines.slice(0, -1);
+        for (let displayLine of displayLines) {
+            logger(prefix + displayLine);
+        }
+    };
+}
 const defaultRoomOptions = {
     ttlOnInit: 10 * 1000,
     ttlOnEmpty: 15 * 60 * 1000
@@ -183,11 +197,15 @@ export class Room {
         sandboxDescriptor["varhub:room"] = { type: "js", source: roomModuleText, links: ["varhub:inner"] };
         sandboxDescriptor["varhub:inner"] = { type: "js", source: innerModuleText, links: [], evaluate: true };
         this.#sandbox = await ModuleSandbox.create(sandboxDescriptor, {
-            stdout: 1,
-            stderr: 2,
+            stdout: "pipe",
+            stderr: "pipe",
             maxOldGenerationSizeMb: 1000,
             contextHooks: ["console", "EventTarget", "Event", "performance"],
         });
+        const outLogger = createDataLogger(console.log, "[room:out]");
+        const errLogger = createDataLogger(console.error, "[room:err]");
+        this.#sandbox?.sdtout?.on("data", outLogger);
+        this.#sandbox?.sdterr?.on("data", errLogger);
         this.#sandbox?.once("exit", (reason) => this.close(reason));
         const hooks = {
             kick: (clientId, reason) => { this.#onKickHook(String(clientId), String(reason)); },
