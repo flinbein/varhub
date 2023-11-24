@@ -29,7 +29,15 @@ const isRoomJsonModule = T({
 	type: "json",
 	source: T.string,
 })
-const isRoomModule = T(isRoomJsModule, isRoomJsonModule);
+const isRoomTextModule = T({
+	type: "text",
+	source: T.string,
+})
+const isBinModule = T({
+	type: "bin",
+	source: T.instanceOf(Uint8Array),
+})
+const isRoomModule = T(isRoomJsModule, isRoomJsonModule, isRoomTextModule, isBinModule);
 
 const isClientOrClientList = T(T.string,T.arrayOf(T.string));
 
@@ -149,6 +157,16 @@ export class Room {
 				hashObject.modules[moduleName] = ["json", moduleConfig.source];
 				continue;
 			}
+			if (moduleConfig.type === "text") {
+				sandboxDescriptor[moduleName] = {type: "text", source: moduleConfig.source}
+				hashObject.modules[moduleName] = ["text", moduleConfig.source];
+				continue;
+			}
+			if (moduleConfig.type === "bin") {
+				sandboxDescriptor[moduleName] = {type: "bin", source: moduleConfig.source}
+				hashObject.modules[moduleName] = ["bin", moduleConfig.source];
+				continue;
+			}
 			if (moduleName in innerModulesAsync) {
 				if (moduleConfig?.source) throw new Error("overriding inner module: "+moduleName);
 				const source = await innerModulesAsync[moduleName];
@@ -197,6 +215,7 @@ export class Room {
 		this.#sandbox = await ModuleSandbox.create(sandboxDescriptor, {
 			stdout: 1,
 			stderr: 2,
+			maxOldGenerationSizeMb: 1000,
 			contextHooks: ["console", "EventTarget", "Event", "performance"],
 		});
 		this.#sandbox?.once("exit", (reason) => this.close(reason));
