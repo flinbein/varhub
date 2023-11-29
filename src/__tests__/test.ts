@@ -1,4 +1,4 @@
-import { describe, it, mock } from "node:test";
+import { describe, it } from "node:test";
 import assert from "node:assert";
 
 import { Room } from "../varhub/Room";
@@ -6,7 +6,7 @@ import { Room } from "../varhub/Room";
 console.log("TEST-GO", Room);
 
 describe("Room create", async () => {
-	const room = new Room(mock.fn(), mock.fn(), mock.fn(), {ttlOnEmpty: 10, ttlOnInit: 1000});
+	const room = new Room({ttlOnEmpty: 10, ttlOnInit: 1000});
 	await it("init-test", async () => {
 		void({
 			hooks: {
@@ -58,6 +58,7 @@ describe("Room create", async () => {
 				}
 			},
 			config: undefined,
+			integrity: undefined,
 			integrityRequired: undefined
 		});
 

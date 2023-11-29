@@ -1,10 +1,10 @@
 import { URL } from "node:url";
 import { readFile } from "node:fs";
-import ModuleSandbox from "sandboxer";
-import T, { ResolveTypeChecker } from "t-type-check";
-
+import ModuleSandbox from "@flinbein/sandboxer";
+import getStableHash from "@flinbein/json-stable-hash";
+import T, { ResolveTypeChecker } from "@flinbein/t-type-check";
 import type { TranscodeEncoding } from "node:buffer";
-import { getStableHash } from "../utils/getStableHash.js";
+import EventEmitter from "events";
 
 const roomTextPromise = asyncReadFile("./controller/$room.js", "utf-8");
 const innerTextPromise = asyncReadFile("./controller/$inner.js", "utf-8");
@@ -44,6 +44,7 @@ const isClientOrClientList = T(T.string,T.arrayOf(T.string));
 export const isRoomCreateData = T({
 	modules: T.mapOf(isRoomModule),
 	config: T.any.optional,
+	integrity: T.string.optional,
 	integrityRequired: T.bool.optional
 });
 
@@ -85,10 +86,7 @@ const defaultRoomOptions: RoomOptions = {
 
 export type RoomStatus = "new"|"init"|"ready"|"closed"|"error"
 
-export class Room {
-	readonly #onCloseHook: (reason: string) => void;
-	readonly #onKickHook: (client: string, reason: string) => void;
-	readonly #onEventHook: (clients: Iterable<string>, ...data: unknown[]) => void;
+export class Room extends EventEmitter {
 	readonly #clients: Set<string> = new Set();
 	readonly #remoteClientIdMap: Map<string, unknown> = new Map();
 	readonly #aliases: Map<string, [string, string]> = new Map();
@@ -112,7 +110,7 @@ export class Room {
 		return this.#hash;
 	}
 	
-	#setLifeToLive(ttl: number){
+	#setTimeToLive(ttl: number){
 		this.#clearTimeToLive()
 		this.#lifeTimer = setTimeout(() => this.close("room timeout"), ttl)
 	}
@@ -126,16 +124,9 @@ export class Room {
 		return this.#clients.values();
 	}
     
-    constructor(
-		onEvent: (clients: Iterable<string>, ...data: unknown[]) => void,
-		onKick: (client: string, reason: string) => void,
-		onClose: (reason: string) => void,
-		options: Partial<RoomOptions> = {}
-    ) {
+    constructor(options: Partial<RoomOptions> = {}) {
+		super();
 		this.#options = {...defaultRoomOptions, ...options};
-		this.#onCloseHook = onClose;
-		this.#onKickHook = onKick;
-		this.#onEventHook = onEvent;
     }
 	
 	#registerAlias(alias: string, module: string, functionName: string){
@@ -157,9 +148,10 @@ export class Room {
 		}
 	}
 	
-	public async _init({modules: moduleDescriptors, config, integrityRequired}: RoomCreateData){
+	public async _init({modules: moduleDescriptors, config, integrityRequired, integrity}: RoomCreateData){
+		this.#hash = getStableHash(moduleDescriptors, "sha256", "hex");
+		if (integrity != null && integrity !== this.#hash) throw new Error("integrity mismatch");
 		const names = Object.keys(moduleDescriptors);
-		const hashObject = {modules: {}, alias: {}} as any;
 		if (names.some(name => name.startsWith("varhub:"))) throw new Error("forbidden module domain: `varhub:`")
 		const sandboxDescriptor: Parameters<typeof ModuleSandbox.create>[0] = {};
 		const roomModuleText = await roomTextPromise;
@@ -168,52 +160,43 @@ export class Room {
 			if (!moduleConfig) continue;
 			if (moduleConfig.type === "json") {
 				sandboxDescriptor[moduleName] = {type: "json", source: moduleConfig.source}
-				hashObject.modules[moduleName] = ["json", moduleConfig.source];
 				continue;
 			}
 			if (moduleConfig.type === "text") {
 				sandboxDescriptor[moduleName] = {type: "text", source: moduleConfig.source}
-				hashObject.modules[moduleName] = ["text", moduleConfig.source];
 				continue;
 			}
 			if (moduleConfig.type === "bin") {
 				sandboxDescriptor[moduleName] = {type: "bin", source: moduleConfig.source}
-				hashObject.modules[moduleName] = ["bin", moduleConfig.source];
 				continue;
 			}
 			if (moduleName in innerModulesAsync) {
 				if (moduleConfig?.source) throw new Error("overriding inner module: "+moduleName);
 				const source = await innerModulesAsync[moduleName];
 				sandboxDescriptor[moduleName] = {type: "js", source, links: ["varhub:room", "varhub:config"], evaluate: Boolean(moduleConfig?.evaluate)}
-				hashObject.modules[moduleName] = ["js", source, Boolean(moduleConfig?.evaluate)]
 			} else {
 				const source = moduleConfig?.source ?? "";
 				if (!source) throw new Error("empty module: "+moduleName);
 				sandboxDescriptor[moduleName] = {type: "js", source, links: [...names, "varhub:room", "varhub:config"], evaluate: moduleConfig?.evaluate}
-				hashObject[moduleName] = ["js", source, Boolean(moduleConfig?.evaluate)]
 			}
 			
 			if (moduleConfig?.hooks) {
 				if (Array.isArray(moduleConfig?.hooks)) {
 					for (const alias of moduleConfig.hooks) {
 						this.#registerAlias(alias, moduleName, alias);
-						hashObject.alias[alias] = [moduleName, alias];
 					}
 				} else if (moduleConfig?.hooks === "*") {
 					if (this.#starInvokeHandler != null) {
 						throw new Error(`alias * overlap: in ${module}, ${this.#starInvokeHandler}`);
 					}
 					this.#starInvokeHandler = moduleName;
-					hashObject.mainInvokeHandler = moduleName;
 				} else {
 					for (const [alias, functionName] of Object.entries(moduleConfig.hooks)) {
 						if (functionName === true) {
 							this.#registerAlias(alias, moduleName, alias);
-							hashObject.alias[alias] = [moduleName, alias];
 						}
 						else if (typeof functionName === "string") {
 							this.#registerAlias(alias, moduleName, functionName);
-							hashObject.alias[alias] = [moduleName, functionName];
 						}
 					}
 				}
@@ -229,7 +212,7 @@ export class Room {
 		this.#sandbox = await ModuleSandbox.create(sandboxDescriptor, {
 			stdout: "pipe",
 			stderr: "pipe",
-			maxOldGenerationSizeMb: 1000,
+			maxOldGenerationSizeMb: 100,
 			contextHooks: ["console", "EventTarget", "Event", "performance"],
 		});
 		const outLogger = createDataLogger(console.log, "[room:out]")
@@ -239,17 +222,16 @@ export class Room {
 		this.#sandbox?.once("exit", (reason) => this.close(reason));
 		
 		const hooks = {
-			kick: (clientId: string, reason:string) => {this.#onKickHook(String(clientId), String(reason))},
+			kick: (clientId: string, reason:string) => this.emit("kick", String(clientId), String(reason)),
 			send: (clientId: string | Iterable<string>, ...data: unknown[]) => {
-				this.#onEventHook(isClientOrClientList.assert(clientId), ...data);
+				this.emit("event", isClientOrClientList.assert(clientId), ...data);
 			},
-			close: (reason: string) => {this.close(String(reason))}
+			close: (reason: string) => this.close(String(reason))
 		}
 		const mappingOfInit = {mapping: "link", responseMapping: "ignore", hookMode: {mapping: "json", responseMapping: "ignore", noThis: true}} as const;
 		await this.#sandbox?.invoke("varhub:inner", "init", undefined, [hooks], mappingOfInit);
-		this.#hash = getStableHash(hashObject, "sha256", "hex");
 		this.#integrityRequired = Boolean(integrityRequired);
-		this.#setLifeToLive(this.#options.ttlOnInit);
+		this.#setTimeToLive(this.#options.ttlOnInit);
 	}
 	
 	async addClient(clientId: string, ...message: unknown[]): Promise<unknown> {
@@ -277,7 +259,7 @@ export class Room {
 			this.#sandbox?.invoke("varhub:inner", "onLeave", undefined, [clientId, remoteClient], {mapping: "link", responseMapping: "ignore"});
 		}
 		this.#remoteClientIdMap.delete(clientId);
-		if (this.#clients.size === 0) this.#setLifeToLive(this.#options.ttlOnEmpty);
+		if (this.#clients.size === 0) this.#setTimeToLive(this.#options.ttlOnEmpty);
 		return hasClient;
 	}
 	
@@ -298,6 +280,7 @@ export class Room {
 		this.#status = "closed"
 		this.#clearTimeToLive();
 		this.#sandbox?.kill();
-		this.#onCloseHook(reason);
+		this.emit("close", reason);
+		this.removeAllListeners();
 	}
 }

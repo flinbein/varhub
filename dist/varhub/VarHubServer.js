@@ -1,7 +1,8 @@
-import T from "t-type-check";
+import T from "@flinbein/t-type-check";
 import { Room, isRoomCreateData } from "./Room.js";
+import EventEmitter from "events";
 const isCommandData = T.listPartOf([T("room", "join", "call")]);
-export class VarHubServer {
+export class VarHubServer extends EventEmitter {
     #clients = new Map();
     #rooms = new Map();
     #clientToRoomIdMap = new WeakMap();
@@ -10,6 +11,7 @@ export class VarHubServer {
         const onExitHook = () => this.#onExit(client, id);
         const onCallHook = (...args) => this.#onCall(client, id, ...args);
         const client = registerClientFn(onCallHook, onExitHook);
+        this.emit("clientJoin", id, client);
         this.#clients.set(id, client);
         return id;
     }
@@ -18,6 +20,7 @@ export class VarHubServer {
     }
     #onExit(client, id) {
         this.#clients.delete(id);
+        this.emit("clientLeave", id, client);
         const roomId = this.#clientToRoomIdMap.get(client);
         if (roomId != null) {
             const room = this.#rooms.get(roomId);
@@ -26,25 +29,27 @@ export class VarHubServer {
         }
     }
     async #onCall(client, id, ...data) {
+        this.emit("clientCommand", id, client, ...data);
         const [cmd, ...args] = isCommandData.assert(data, "wrong `message` format");
         if (cmd === "room")
-            return this.createRoom(client, id, args[0]);
+            return this.#createRoom(client, id, args[0]);
         if (cmd === "join")
-            return this.joinRoom(client, id, ...args);
+            return this.#joinRoom(client, id, ...args);
         if (cmd === "call")
-            return this.callRoom(client, id, ...args);
+            return this.#callRoom(client, id, ...args);
     }
-    async createRoom(client, clientId, data) {
+    async #createRoom(client, clientId, data) {
         const roomData = isRoomCreateData.assert(data, "wrong `room` format");
         const id = this.generateRoomId();
         try {
             this.#rooms.set(id, null);
-            const onCloseHook = (reason) => this.#onCloseRoom(room, id, reason);
-            const onKickHook = (client, reason) => this.#onKick(room, id, client, reason);
-            const onEventHook = (clients, ...data) => this.#onRoomEvent(room, id, clients, ...data);
-            const room = new Room(onEventHook, onKickHook, onCloseHook);
+            const room = new Room({});
+            room.on("event", (clients, ...data) => this.#onRoomEvent(room, id, clients, ...data));
+            room.on("kick", (client, reason) => this.#onRoomKick(room, id, client, reason));
+            room.on("close", (reason) => this.#onRoomClose(room, id, reason));
             await room.init(roomData);
             this.#rooms.set(id, room);
+            this.emit("clientCreateRoom", clientId, client, room, data);
             return [id, room.hash];
         }
         catch (e) {
@@ -52,13 +57,13 @@ export class VarHubServer {
             throw e;
         }
     }
-    #onCloseRoom = async (room, id, reason) => {
+    #onRoomClose = async (room, id, reason) => {
         this.#rooms.delete(id);
         for (let clientId of room.getClients()) {
             this.#clients.get(clientId)?.disconnect(reason);
         }
     };
-    #onKick = async (room, roomId, clientId, reason) => {
+    #onRoomKick = async (room, roomId, clientId, reason) => {
         this.#clients.get(clientId)?.disconnect(reason);
     };
     #onRoomEvent(room, roomId, clients, ...data) {
@@ -78,7 +83,7 @@ export class VarHubServer {
             length++;
         }
     }
-    async joinRoom(client, clientId, ...args) {
+    async #joinRoom(client, clientId, ...args) {
         const [roomId, integrityKey, ...message] = T.listPartOf([T.string, T(T.string, null)]).assert(args, "wrong `join` format");
         if (this.#clientToRoomIdMap.has(client))
             throw new Error("already in room");
@@ -104,7 +109,7 @@ export class VarHubServer {
             throw error;
         }
     }
-    async callRoom(client, clientId, ...args) {
+    async #callRoom(client, clientId, ...args) {
         const roomId = this.#clientToRoomIdMap.get(client);
         const room = roomId != null ? this.#rooms.get(roomId) : null;
         if (room == null)
