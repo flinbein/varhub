@@ -5,6 +5,7 @@
 		"target": "ESNext",
 		"lib": ["ESNext"],
 		"module": "NodeNext",
+		"allowSyntheticDefaultImports": true,
 		"moduleResolution": "NodeNext",
 		"outDir": "./dist",
 		"strict": true,
