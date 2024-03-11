@@ -1,12 +1,12 @@
 import { describe, it } from "node:test";
 import assert from "node:assert";
 
-import { Room } from "../varhub/Room";
+import { Room_ } from "../varhub/Room_";
 
-console.log("TEST-GO", Room);
+console.log("TEST-GO", Room_);
 
-describe("Room create", async () => {
-	const room = new Room({ttlOnEmpty: 10, ttlOnInit: 1000});
+describe("Room_ create", async () => {
+	const room = new Room_({ttlOnEmpty: 10, ttlOnInit: 1000});
 	await it("init-test", async () => {
 		void({
 			hooks: {
@@ -67,13 +67,13 @@ describe("Room create", async () => {
 		assert.notEqual(time1, time2);
 
 
-		const client1Connected = await room.addClient("AndreyQ", "roomPass", 12);
+		const client1Connected = await room.addMember("AndreyQ", "roomPass", 12);
 		assert.equal(client1Connected, true);
 
-		const client2Connected = await room.addClient("CoolHacher99", "wrong-pass");
+		const client2Connected = await room.addMember("CoolHacher99", "wrong-pass");
 		assert.equal(client2Connected, false);
 
-		const client3Connected = await room.addClient("MYXOMOPX", "roomPass");
+		const client3Connected = await room.addMember("MYXOMOPX", "roomPass");
 		assert.equal(client3Connected, true);
 
 		const resultClients1 = await room.call("AndreyQ", "getClients");

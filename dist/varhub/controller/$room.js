@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { target, clientMap, send, broadcast, close } from "varhub:inner";
+import { target, clientMap, send, broadcast, close, isPublished, publish, unpublish, setPublicMessage, getPublicMessage } from "varhub:inner";
 export default Object.freeze({
     getClients: () => [...clientMap.values()],
     getClientById: (id) => clientMap.get(id),
@@ -7,5 +7,10 @@ export default Object.freeze({
     removeEventListener: target.removeEventListener.bind(target),
     send,
     broadcast,
-    close
+    close,
+    isPublished,
+    publish,
+    unpublish,
+    getPublicMessage,
+    setPublicMessage
 });

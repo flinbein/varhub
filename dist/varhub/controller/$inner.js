@@ -90,3 +90,25 @@ export function close(reason) {
 export function deref(value) {
     return value;
 }
+let publicFlag = false;
+let publicMessage = null;
+export function isPublished() {
+    return publicFlag;
+}
+export function publish() {
+    if (publicFlag)
+        return;
+    hooks.setPublic(publicFlag = true);
+}
+export function unpublish() {
+    if (!publicFlag)
+        return;
+    hooks.setPublic(publicFlag = false);
+}
+export function setPublicMessage(value) {
+    publicMessage = value === undefined ? value : JSON.parse(JSON.stringify(value));
+    hooks.setPublicMessage(publicMessage);
+}
+export function getPublicMessage() {
+    return publicMessage;
+}
