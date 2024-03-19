@@ -2,51 +2,48 @@ import { MapOfSet } from "../utils/MapOfSet.js";
 import TypedEventEmitter from "../utils/TypedEventEmitter.js";
 export class Hub extends TypedEventEmitter {
     #rooms = new Map;
-    #publicRooms = new MapOfSet;
-    #lastRoomPublicType = new WeakMap;
-    addRoom(room) {
+    #roomIdIntegrity = new Map;
+    #integrityOfRooms = new MapOfSet;
+    addRoom(room, integrity) {
         if (room.destroyed)
             return null;
         const roomId = generateStringKey(s => !this.#rooms.has(s));
-        this.#onRoomChangePublicType(roomId, room, room.publicType);
-        const onChangePublicType = (value) => this.#onRoomChangePublicType(roomId, room, value);
-        const onLog = (level, message) => this.emit("log", roomId, room, level, message);
-        room.on("changePublicType", onChangePublicType);
-        room.on("log", onLog);
-        room.once("destroy", () => {
-            room.off("changePublicType", onChangePublicType);
-            room.off("log", onLog);
-            this.#onRoomDestroy(roomId, room);
-        });
+        this.#roomIdIntegrity.set(roomId, integrity);
+        this.#rooms.set(roomId, room);
+        if (integrity)
+            this.#integrityOfRooms.add(integrity, roomId);
+        room.once("destroy", () => this.#onRoomDrop(roomId, room));
         this.emit("addRoom", roomId, room);
         return roomId;
     }
-    getRoom(id, publicType) {
-        const room = this.#rooms.get(id);
+    getRoom(id) {
+        return this.#rooms.get(id);
+    }
+    getRoomIntegrity(id) {
+        return this.#roomIdIntegrity.get(id);
+    }
+    dropRoom(id) {
+        const room = this.getRoom(id);
         if (!room)
-            return undefined;
-        if (publicType != null && room.publicType !== publicType)
-            return undefined;
-        return room;
+            return false;
+        this.#onRoomDrop(id, room);
+        return true;
     }
-    getPublicRooms(integrity) {
-        return this.#publicRooms.get(integrity) ?? new Set;
+    getRooms() {
+        return new Set(this.#rooms.keys());
     }
-    #onRoomDestroy(roomId, room) {
-        this.#rooms.delete(roomId);
-        const lastPublicType = this.#lastRoomPublicType.get(room);
-        if (lastPublicType != null)
-            this.#publicRooms.delete(lastPublicType, roomId);
-        this.emit("destroyRoom", roomId, room);
+    getRoomsByIntegrity(integrity) {
+        return new Set(this.#integrityOfRooms.get(integrity) ?? null);
     }
-    #onRoomChangePublicType(roomId, room, publicType) {
-        const lastPublicType = this.#lastRoomPublicType.get(room);
-        if (lastPublicType != null)
-            this.#publicRooms.delete(lastPublicType, roomId);
-        if (publicType != null) {
-            this.#publicRooms.add(publicType, roomId);
-        }
-        this.emit("changeRoomPublicType", roomId, room, publicType);
+    #onRoomDrop(roomId, room) {
+        const roomIsDeleted = this.#rooms.delete(roomId);
+        if (!roomIsDeleted)
+            return;
+        const integrity = this.#roomIdIntegrity.get(roomId);
+        this.#roomIdIntegrity.delete(roomId);
+        if (integrity != null)
+            this.#integrityOfRooms.delete(integrity, roomId);
+        this.emit("dropRoom", roomId, room);
     }
 }
 function generateStringKey(check, length = 5, pattern = "0123456789") {

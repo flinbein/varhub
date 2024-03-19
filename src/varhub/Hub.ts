@@ -1,63 +1,62 @@
 import { MapOfSet } from "../utils/MapOfSet.js";
 import TypedEventEmitter from "../utils/TypedEventEmitter.js";
 import { Room } from "./Room.js";
-import { LOG_LEVEL } from "../types.js";
+import { CustomType } from "../types.js";
 
+type RoomId = CustomType<string, Room, "id">;
+type RoomIntegrityId = CustomType<string|null, Room, "publicId">;
 type HubEvents = {
-	destroyRoom: [roomId: string, room: Room],
-	publishRoom: [roomId: string, room: Room],
-	changeRoomPublicType: [roomId: string, room: Room, publicType: string|null],
-	addRoom: [roomId: string, room: Room],
-	log: [roomId: string, room: Room, level: LOG_LEVEL, message: string],
+	dropRoom: [roomId: RoomId, room: Room],
+	addRoom: [roomId: RoomId, room: Room],
 }
 export class Hub extends TypedEventEmitter<HubEvents> {
 	
-	#rooms = new Map<string, Room>
-	#publicRooms = new MapOfSet<string, string>
-	#lastRoomPublicType = new WeakMap<Room, string>
+	#rooms = new Map<RoomId, Room>
+	#roomIdIntegrity = new Map<RoomId, RoomIntegrityId>;
+	#integrityOfRooms = new MapOfSet<RoomIntegrityId, RoomId>;
 	
-	addRoom(room: Room): string | null {
+	addRoom(room: Room, integrity?: string): string | null {
 		if (room.destroyed) return null;
-		const roomId = generateStringKey(s => !this.#rooms.has(s));
-		this.#onRoomChangePublicType(roomId, room, room.publicType);
-		const onChangePublicType = (value: string|null) => this.#onRoomChangePublicType(roomId, room, value);
-		const onLog = (level: LOG_LEVEL, message: string) => this.emit("log", roomId, room, level, message)
-		room.on("changePublicType", onChangePublicType );
-		room.on("log", onLog);
-		room.once("destroy", () => {
-			room.off("changePublicType", onChangePublicType);
-			room.off("log", onLog);
-			this.#onRoomDestroy(roomId, room);
-		});
+		const roomId = generateStringKey(s => !this.#rooms.has(s as any)) as RoomId;
+		this.#roomIdIntegrity.set(roomId, integrity as RoomIntegrityId);
+		this.#rooms.set(roomId, room);
+		if (integrity) this.#integrityOfRooms.add(integrity as RoomIntegrityId, roomId);
+		room.once("destroy", () => this.#onRoomDrop(roomId, room));
 		this.emit("addRoom", roomId, room);
 		return roomId;
 	}
 	
-	getRoom(id: string, publicType?: string): Room | undefined {
-		const room =  this.#rooms.get(id);
-		if (!room) return undefined;
-		if (publicType != null && room.publicType !== publicType) return undefined;
-		return room;
+	getRoom(id: string): Room | undefined {
+		return this.#rooms.get(id as RoomId);
 	}
 	
-	getPublicRooms(integrity: string): ReadonlySet<string> {
-		return this.#publicRooms.get(integrity) ?? new Set;
+	getRoomIntegrity(id: string): string | undefined {
+		return this.#roomIdIntegrity.get(id as RoomId);
 	}
 	
-	#onRoomDestroy(roomId: string, room: Room){
-		this.#rooms.delete(roomId);
-		const lastPublicType = this.#lastRoomPublicType.get(room);
-		if (lastPublicType != null) this.#publicRooms.delete(lastPublicType, roomId);
-		this.emit("destroyRoom", roomId, room);
+	dropRoom(id: string): boolean {
+		const room = this.getRoom(id);
+		if (!room) return false;
+		this.#onRoomDrop(id as RoomId, room);
+		return true;
+		
 	}
 	
-	#onRoomChangePublicType(roomId: string, room: Room, publicType: string|null){
-		const lastPublicType = this.#lastRoomPublicType.get(room);
-		if (lastPublicType != null) this.#publicRooms.delete(lastPublicType, roomId);
-		if (publicType != null) {
-			this.#publicRooms.add(publicType, roomId);
-		}
-		this.emit("changeRoomPublicType", roomId, room, publicType);
+	getRooms(): ReadonlySet<string> {
+		return new Set(this.#rooms.keys());
+	}
+	
+	getRoomsByIntegrity(integrity: string): ReadonlySet<string> {
+		return new Set(this.#integrityOfRooms.get(integrity as RoomIntegrityId) ?? null);
+	}
+	
+	#onRoomDrop(roomId: RoomId, room: Room){
+		const roomIsDeleted = this.#rooms.delete(roomId);
+		if (!roomIsDeleted) return;
+		const integrity = this.#roomIdIntegrity.get(roomId);
+		this.#roomIdIntegrity.delete(roomId);
+		if (integrity != null) this.#integrityOfRooms.delete(integrity, roomId);
+		this.emit("dropRoom", roomId, room);
 	}
 }
 

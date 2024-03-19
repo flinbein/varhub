@@ -1,5 +1,0 @@
-<component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="src\__tests__\test.ts" type="NodeJSConfigurationType" node-parameters="--loader ts-node/esm" path-to-js-file="src/__tests__/test.ts" working-dir="$PROJECT_DIR$">
-    <method v="2" />
-  </configuration>
-</component>
