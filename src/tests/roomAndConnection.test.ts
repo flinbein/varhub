@@ -1,4 +1,3 @@
-// @ts-ignore
 import { default as assert } from "node:assert";
 import { describe as DESCRIBE, it, mock } from "node:test";
 
@@ -19,31 +18,31 @@ void DESCRIBE("Room and member", async () => {
 	await it("enter client", () => {
 		const enterEventHandler = mock.fn();
 		const room = new Room();
-		room.on("memberEnter", enterEventHandler)
-		const member = room.createMember("foo", "bar");
+		room.on("connectionEnter", enterEventHandler)
+		const member = room.createConnection("foo", "bar");
 		assert.equal(enterEventHandler.mock.callCount(), 1);
 		assert.deepEqual(enterEventHandler.mock.calls[0].arguments, [member, "foo", "bar"]);
-		assert.deepEqual(room.getLobbyMembers(), [member]);
-		assert.deepEqual(room.getJoinedMembers(), []);
+		assert.deepEqual(room.getLobbyConnections(), [member]);
+		assert.deepEqual(room.getJoinedConnections(), []);
 	});
 	
 	await it("kick client", () => {
 		const leaveEventHandler = mock.fn();
 		const room = new Room();
-		room.on("memberLeave", leaveEventHandler);
-		const member = room.createMember("foo", "bar");
-		assert.deepEqual(room.getLobbyMembers(), [member]);
-		assert.deepEqual(room.getJoinedMembers(), []);
+		room.on("connectionClosed", leaveEventHandler);
+		const member = room.createConnection("foo", "bar");
+		assert.deepEqual(room.getLobbyConnections(), [member]);
+		assert.deepEqual(room.getJoinedConnections(), []);
 		
 		const joinResult = room.join(member);
 		assert.equal(joinResult, true);
-		assert.deepEqual(room.getLobbyMembers(), []);
-		assert.deepEqual(room.getJoinedMembers(), [member]);
+		assert.deepEqual(room.getLobbyConnections(), []);
+		assert.deepEqual(room.getJoinedConnections(), [member]);
 		assert.equal(leaveEventHandler.mock.callCount(), 0);
 		
 		room.kick(member, "messageToKick");
-		assert.deepEqual(room.getLobbyMembers(), []);
-		assert.deepEqual(room.getJoinedMembers(), []);
+		assert.deepEqual(room.getLobbyConnections(), []);
+		assert.deepEqual(room.getJoinedConnections(), []);
 		assert.equal(leaveEventHandler.mock.callCount(), 1);
 		assert.deepEqual(leaveEventHandler.mock.calls[0].arguments, [member, true, "messageToKick"]);
 	});
@@ -53,15 +52,15 @@ void DESCRIBE("Room and member", async () => {
 		const disconnectEventHandler = mock.fn();
 		const enterEventHandler = mock.fn();
 		const room = new Room();
-		room.on("memberLeave", leaveEventHandler);
-		room.on("memberEnter", enterEventHandler);
+		room.on("connectionClosed", leaveEventHandler);
+		room.on("connectionEnter", enterEventHandler);
 		
-		assert.deepEqual(room.getLobbyMembers(), []);
+		assert.deepEqual(room.getLobbyConnections(), []);
 		assert.equal(enterEventHandler.mock.callCount(), 0);
 		
-		const member = room.createMember("foo", "bar");
+		const member = room.createConnection("foo", "bar");
 		member.on("disconnect", disconnectEventHandler);
-		assert.deepEqual(room.getLobbyMembers(), [member]);
+		assert.deepEqual(room.getLobbyConnections(), [member]);
 		assert.equal(enterEventHandler.mock.callCount(), 1);
 		assert.deepEqual(enterEventHandler.mock.calls[0].arguments, [member, "foo", "bar"]);
 		
@@ -69,7 +68,7 @@ void DESCRIBE("Room and member", async () => {
 		assert.equal(disconnectEventHandler.mock.callCount(), 0);
 		member.leave("justLeave");
 		assert.equal(member.status, "disconnected");
-		assert.deepEqual(room.getLobbyMembers(), []);
+		assert.deepEqual(room.getLobbyConnections(), []);
 		assert.equal(leaveEventHandler.mock.callCount(), 1);
 		assert.deepEqual(leaveEventHandler.mock.calls[0].arguments, [member, false, "justLeave"]);
 		assert.equal(disconnectEventHandler.mock.callCount(), 1);
@@ -81,28 +80,28 @@ void DESCRIBE("Room and member", async () => {
 		const disconnectEventHandler = mock.fn();
 		const room = new Room();
 		
-		assert.deepEqual(room.getLobbyMembers(), []);
-		assert.deepEqual(room.getJoinedMembers(), []);
+		assert.deepEqual(room.getLobbyConnections(), []);
+		assert.deepEqual(room.getJoinedConnections(), []);
 		
-		const member = room.createMember("foo", "bar");
+		const member = room.createConnection("foo", "bar");
 		member.on("disconnect", disconnectEventHandler)
 		assert.equal(member.status, "lobby");
 		
-		assert.deepEqual(room.getLobbyMembers(), [member]);
-		assert.deepEqual(room.getJoinedMembers(), []);
+		assert.deepEqual(room.getLobbyConnections(), [member]);
+		assert.deepEqual(room.getJoinedConnections(), []);
 
 		const joinResult = room.join(member);
 		assert.equal(joinResult, true);
 		assert.equal(member.status, "joined");
 		
-		assert.deepEqual(room.getLobbyMembers(), []);
-		assert.deepEqual(room.getJoinedMembers(), [member]);
+		assert.deepEqual(room.getLobbyConnections(), []);
+		assert.deepEqual(room.getJoinedConnections(), [member]);
 
 		member.leave("justLeave");
 		assert.equal(member.status, "disconnected");
 		
-		assert.deepEqual(room.getLobbyMembers(), []);
-		assert.deepEqual(room.getJoinedMembers(), []);
+		assert.deepEqual(room.getLobbyConnections(), []);
+		assert.deepEqual(room.getJoinedConnections(), []);
 		
 		assert.equal(disconnectEventHandler.mock.callCount(), 1);
 		assert.deepEqual(disconnectEventHandler.mock.calls[0].arguments, [true, "justLeave"]);
@@ -114,7 +113,7 @@ void DESCRIBE("Room and member", async () => {
 		const eventEventHandler = mock.fn();
 		
 		const room = new Room();
-		const member = room.createMember("foo", "bar");
+		const member = room.createConnection("foo", "bar");
 		member.on("join", joinEventHandler)
 		member.on("event", eventEventHandler)
 		member.on("disconnect", disconnectEventHandler);

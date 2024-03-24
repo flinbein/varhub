@@ -1,4 +1,4 @@
-import { Member } from "./Member.js";
+import { Connection } from "./Connection.js";
 import TypedEventEmitter from "../utils/TypedEventEmitter.js";
 export interface CallResult {
 	type: "success" | "error";
@@ -7,16 +7,16 @@ export interface CallResult {
 
 export type RoomEvents = {
 	messageChange: [string|null, string|null],
-	memberEnter: [Member, ...any[]]
-	memberMessage: [Member, ...any[]]
-	memberJoin: [Member]
-	memberLeave: [member: Member, online: boolean, message: string|null]
+	connectionEnter: [Connection, ...any[]]
+	connectionMessage: [Connection, ...any[]]
+	connectionJoin: [Connection]
+	connectionClosed: [member: Connection, online: boolean, message: string|null]
 	destroy: [],
 }
 export class Room extends TypedEventEmitter<RoomEvents> {
 	#publicMessage: string | null = null;
-	#lobbyMembersSet = new Set<Member>();
-	#joinedMembersSet = new Set<Member>();
+	#lobbyConnectionsSet = new Set<Connection>();
+	#joinedConnectionsSet = new Set<Connection>();
 	#isDestroyed = false;
 	
 	get publicMessage() : string | null {
@@ -29,39 +29,39 @@ export class Room extends TypedEventEmitter<RoomEvents> {
 		this.emit("messageChange", msg, oldMessage);
 	}
 	
-	#memberMessage(member: Member, ...args: any[]): void {
-		if (!this.#joinedMembersSet.has(member)) return;
-		this.emit("memberMessage", member, ...args);
+	#connectionMessage(connection: Connection, ...args: any[]): void {
+		if (!this.#joinedConnectionsSet.has(connection)) return;
+		this.emit("connectionMessage", connection, ...args);
 	}
 	
-	createMember(...enterArgs: any[]): Member {
-		const call = (...args: any[]) => this.#memberMessage(member, ...args);
-		const member: Member = new Member(this, call);
-		this.#lobbyMembersSet.add(member);
-		this.emit("memberEnter", member, ...enterArgs);
-		return member;
+	createConnection(...enterArgs: any[]): Connection {
+		const call = (...args: any[]) => this.#connectionMessage(connection, ...args);
+		const connection: Connection = new Connection(this, call);
+		this.#lobbyConnectionsSet.add(connection);
+		this.emit("connectionEnter", connection, ...enterArgs);
+		return connection;
 	}
-	join(member: Member): boolean {
-		if (!this.#lobbyMembersSet.has(member)) return false;
-		this.#lobbyMembersSet.delete(member);
-		this.#joinedMembersSet.add(member);
-		this.emit("memberJoin", member);
+	join(connection: Connection): boolean {
+		if (!this.#lobbyConnectionsSet.has(connection)) return false;
+		this.#lobbyConnectionsSet.delete(connection);
+		this.#joinedConnectionsSet.add(connection);
+		this.emit("connectionJoin", connection);
 		return true;
 	}
-	kick(member: Member, message: string|null = null): boolean {
-		if (!this.#lobbyMembersSet.has(member) && !this.#joinedMembersSet.has(member)) return false;
-		this.#lobbyMembersSet.delete(member);
-		const online = this.#joinedMembersSet.delete(member);
-		this.emit("memberLeave", member, online, message);
+	kick(connection: Connection, message: string|null = null): boolean {
+		if (!this.#lobbyConnectionsSet.has(connection) && !this.#joinedConnectionsSet.has(connection)) return false;
+		this.#lobbyConnectionsSet.delete(connection);
+		const online = this.#joinedConnectionsSet.delete(connection);
+		this.emit("connectionClosed", connection, online, message);
 		return true;
 	}
 	
 	
-	getLobbyMembers(): Member[] {
-		return [...this.#lobbyMembersSet];
+	getLobbyConnections(): Connection[] {
+		return [...this.#lobbyConnectionsSet];
 	}
-	getJoinedMembers(): Member[] {
-		return [...this.#joinedMembersSet];
+	getJoinedConnections(): Connection[] {
+		return [...this.#joinedConnectionsSet];
 	}
 	
 	get destroyed(): boolean {

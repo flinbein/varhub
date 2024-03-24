@@ -6,11 +6,11 @@ type MemberEvents = {
 	event: [...args: any[]],
 	join: [],
 }
-export class Member extends TypedEventEmitter<MemberEvents> {
-	#call: (...args: unknown[]) => void;
-	#room: Room;
+export class Connection extends TypedEventEmitter<MemberEvents> {
+	readonly #call: (...args: unknown[]) => void;
+	readonly #room: Room;
 	#status: "lobby" | "joined" | "disconnected" = "lobby";
-	#memberJoinListener = (member: Member) => {
+	#connectionJoinListener = (member: Connection) => {
 		if (member !== this) return;
 		this.#status = "joined";
 		this.emit("join");
@@ -19,7 +19,7 @@ export class Member extends TypedEventEmitter<MemberEvents> {
 	get status(){
 		return this.#status;
 	}
-	#memberLeaveListener = (member: Member, online: boolean, reason: string|null) => {
+	#connectionClosedListener = (member: Connection, online: boolean, reason: string|null) => {
 		if (member !== this) return;
 		this.#onDisconnect(reason);
 	}
@@ -32,13 +32,13 @@ export class Member extends TypedEventEmitter<MemberEvents> {
 		super();
 		this.#call = call;
 		this.#room = room;
-		room.on("memberJoin", this.#memberJoinListener);
-		room.on("memberLeave", this.#memberLeaveListener);
+		room.on("connectionJoin", this.#connectionJoinListener);
+		room.on("connectionClosed", this.#connectionClosedListener);
 		room.on("destroy", this.#roomDestroyListener);
 	}
 	
 	get connected(){
-		return this.#call != null;
+		return this.#status === "joined" || this.#status === "lobby";
 	}
 	
 	message(...args: unknown[]): void {
@@ -49,14 +49,14 @@ export class Member extends TypedEventEmitter<MemberEvents> {
 		this.emit("event", ...args);
 	}
 	
-	leave(reason: string|null){
+	leave(reason: string|null = null){
 		this.#room.kick(this, reason);
 	}
 	
 	#onDisconnect(reason: string|null){
 		if (this.#status === "disconnected") return;
-		this.#room.off("memberJoin", this.#memberJoinListener);
-		this.#room.off("memberLeave", this.#memberLeaveListener);
+		this.#room.off("connectionJoin", this.#connectionJoinListener);
+		this.#room.off("connectionClosed", this.#connectionClosedListener);
 		this.#room.off("destroy", this.#roomDestroyListener);
 		const online = this.#status === "joined"
 		this.#status = "disconnected";

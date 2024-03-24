@@ -1,20 +1,19 @@
-// @ts-ignore
 import { default as assert } from "node:assert";
 import { describe as DESCRIBE, it, mock } from "node:test";
 import { Room } from "../varhub/Room.js";
 class RoomController {
     #memberNames = new WeakMap();
     constructor(room) {
-        room.on("memberEnter", (member, name) => {
+        room.on("connectionEnter", (member, name) => {
             this.#memberNames.set(member, name);
             room.join(member);
         });
-        room.on("memberMessage", (member, msg) => {
+        room.on("connectionMessage", (member, msg) => {
             if (msg === "shit") {
                 room.kick(member);
                 return;
             }
-            for (let joinedMember of room.getJoinedMembers()) {
+            for (let joinedMember of room.getJoinedConnections()) {
                 joinedMember.sendEvent("message", this.#memberNames.get(member), msg);
             }
         });
@@ -25,10 +24,10 @@ void DESCRIBE("Room with controller", async () => {
     await it("messages", () => {
         const room = new Room();
         new RoomController(room);
-        const userAlice = room.createMember("Alice");
+        const userAlice = room.createConnection("Alice");
         const aliceEvents = mock.fn();
         userAlice.on("event", aliceEvents);
-        const userBob = room.createMember("Bob");
+        const userBob = room.createConnection("Bob");
         const bobEvents = mock.fn();
         userBob.on("event", bobEvents);
         userBob.message("hi!");

@@ -1,4 +1,3 @@
-// @ts-ignore
 import { default as assert } from "node:assert";
 import { describe as DESCRIBE, it, Mock, mock } from "node:test";
 

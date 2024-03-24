@@ -1,9 +1,9 @@
-import { Member } from "./Member.js";
+import { Connection } from "./Connection.js";
 import TypedEventEmitter from "../utils/TypedEventEmitter.js";
 export class Room extends TypedEventEmitter {
     #publicMessage = null;
-    #lobbyMembersSet = new Set();
-    #joinedMembersSet = new Set();
+    #lobbyConnectionsSet = new Set();
+    #joinedConnectionsSet = new Set();
     #isDestroyed = false;
     get publicMessage() {
         return this.#publicMessage;
@@ -15,39 +15,39 @@ export class Room extends TypedEventEmitter {
         this.#publicMessage = msg;
         this.emit("messageChange", msg, oldMessage);
     }
-    #memberMessage(member, ...args) {
-        if (!this.#joinedMembersSet.has(member))
+    #connectionMessage(connection, ...args) {
+        if (!this.#joinedConnectionsSet.has(connection))
             return;
-        this.emit("memberMessage", member, ...args);
+        this.emit("connectionMessage", connection, ...args);
     }
-    createMember(...enterArgs) {
-        const call = (...args) => this.#memberMessage(member, ...args);
-        const member = new Member(this, call);
-        this.#lobbyMembersSet.add(member);
-        this.emit("memberEnter", member, ...enterArgs);
-        return member;
+    createConnection(...enterArgs) {
+        const call = (...args) => this.#connectionMessage(connection, ...args);
+        const connection = new Connection(this, call);
+        this.#lobbyConnectionsSet.add(connection);
+        this.emit("connectionEnter", connection, ...enterArgs);
+        return connection;
     }
-    join(member) {
-        if (!this.#lobbyMembersSet.has(member))
+    join(connection) {
+        if (!this.#lobbyConnectionsSet.has(connection))
             return false;
-        this.#lobbyMembersSet.delete(member);
-        this.#joinedMembersSet.add(member);
-        this.emit("memberJoin", member);
+        this.#lobbyConnectionsSet.delete(connection);
+        this.#joinedConnectionsSet.add(connection);
+        this.emit("connectionJoin", connection);
         return true;
     }
-    kick(member, message = null) {
-        if (!this.#lobbyMembersSet.has(member) && !this.#joinedMembersSet.has(member))
+    kick(connection, message = null) {
+        if (!this.#lobbyConnectionsSet.has(connection) && !this.#joinedConnectionsSet.has(connection))
             return false;
-        this.#lobbyMembersSet.delete(member);
-        const online = this.#joinedMembersSet.delete(member);
-        this.emit("memberLeave", member, online, message);
+        this.#lobbyConnectionsSet.delete(connection);
+        const online = this.#joinedConnectionsSet.delete(connection);
+        this.emit("connectionClosed", connection, online, message);
         return true;
     }
-    getLobbyMembers() {
-        return [...this.#lobbyMembersSet];
+    getLobbyConnections() {
+        return [...this.#lobbyConnectionsSet];
     }
-    getJoinedMembers() {
-        return [...this.#joinedMembersSet];
+    getJoinedConnections() {
+        return [...this.#joinedConnectionsSet];
     }
     get destroyed() {
         return this.#isDestroyed;
