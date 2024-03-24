@@ -1,11 +1,12 @@
 {
   "name": "varhub",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "node": ">=20.0.0",
   "main": "./dist/index.js",
   "module": "./dist/index.js",
   "packageManager": "yarn@4.0.0-rc.43",
   "type": "module",
+  "types": "./srx/index.ts",
   "scripts": {
     "build": "tsc",
     "test": "node --import=./test/register.js --test **/*.test.*",
