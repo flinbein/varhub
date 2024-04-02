@@ -29,6 +29,10 @@ export class ApiHelperController {
 		return api;
 	}
 	
+	getApi(name: string){
+		return this.#apiInstance.get(name) ?? null;
+	}
+	
 }
 
 export interface ApiHelper {

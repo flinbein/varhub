@@ -26,4 +26,7 @@ export class ApiHelperController {
             this.#apiInstance.set(name, api);
         return api;
     }
+    getApi(name) {
+        return this.#apiInstance.get(name) ?? null;
+    }
 }
