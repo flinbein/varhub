@@ -26,44 +26,66 @@ class ChatController {
     apiHelperController;
     counterApi;
     constructor(room) {
-        this.playerController = new PlayerController(room);
+        const playerController = this.playerController = new PlayerController(room);
         this.apiHelperController = new ApiHelperController(room, apiHelpers);
         this.counterApi = this.apiHelperController.getOrCreateApi("counter");
         this.counterApi.set(1000);
-        this.rpcController = new RPCController(room, (connection, [method, ...args]) => {
-            const player = this.playerController.getPlayerOfConnection(connection);
-            if (!player)
+        function playerHandler(handler) {
+            return (connection, ...args) => {
+                const player = playerController.getPlayerOfConnection(connection);
+                if (!player)
+                    return;
+                const playerId = playerController.getPlayerId(player);
+                if (!playerId)
+                    return;
+                return handler(player, playerId, ...args);
+            };
+        }
+        this.rpcController = new RPCController(room)
+            .addHandler(playerHandler((player, playerId, method, message) => {
+            if (method !== "broadcast")
                 return;
-            const playerId = this.playerController.getPlayerId(player);
-            if (method === "broadcast") {
+            return () => {
                 for (let p of this.playerController.getPlayers().values()) {
-                    p.sendEvent("$rpcEvent", "message", playerId, args[0]);
+                    p.sendEvent("$rpcEvent", "message", playerId, message);
                 }
                 return true;
-            }
-            else if (method === "private") {
-                const recipientPlayer = this.playerController.getPlayerById(args[0]);
+            };
+        }))
+            .addHandler(playerHandler((player, playerId, method, recipientId, message) => {
+            console.log("CHECK PRIVATE", method);
+            if (method !== "private")
+                return;
+            return () => {
+                console.log("CALL PRIVATE GO", playerId, recipientId, message);
+                const recipientPlayer = this.playerController.getPlayerById(String(recipientId));
                 if (!recipientPlayer)
                     return false;
                 if (!recipientPlayer.online)
                     return false;
-                recipientPlayer.sendEvent("$rpcEvent", "privateMessage", playerId, args[1]);
+                console.log("CALL PRIVATE EVT", "$rpcEvent", "privateMessage", playerId, message);
+                recipientPlayer.sendEvent("$rpcEvent", "privateMessage", playerId, message);
                 return true;
-            }
-            else if (method === "changeCounter") {
-                const result = this.counterApi.increment(args[0]);
+            };
+        }))
+            .addHandler((connection, method, incrementValue) => {
+            if (method !== "changeCounter")
+                return;
+            return (connection, m, i) => {
+                const result = this.counterApi.increment(Number(incrementValue));
                 this.playerController.broadcastEvent("$rpcEvent", "counter", result);
                 return result;
-            }
-            else if (method === "getCounter") {
-                return this.counterApi.increment(0);
-            }
-            else if (method === "getPlayers") {
-                return new Set(this.playerController.getPlayers().keys());
-            }
-            else {
-                throw new Error("unknown method " + method);
-            }
+            };
+        })
+            .addHandler((connection, method) => {
+            if (method !== "getCounter")
+                return;
+            return () => this.counterApi.increment(0);
+        })
+            .addHandler((connection, method) => {
+            if (method !== "getPlayers")
+                return;
+            return () => new Set(this.playerController.getPlayers().keys());
         });
     }
 }
@@ -115,11 +137,11 @@ void DESCRIBE("meta controller", async () => {
         const bob = room.createConnection("Bob");
         bob.on("event", bobEvents);
         alice.message("$rpc", 1, "private", "Bob", "Hello");
-        assert.deepEqual(lastArgs(aliceEvents), ["$rpcResult", 1, true, true], "rpc result 1 for Alice");
+        assert.deepEqual(lastArgs(aliceEvents), ["$rpcResult", 1, 0, true], "rpc result 1 for Alice");
         assert.deepEqual(lastArgs(bobEvents), ["$rpcEvent", "privateMessage", "Alice", "Hello"], "PM for Bob");
         bob.leave();
         alice.message("$rpc", 2, "private", "Bob", "Hello again!");
-        assert.deepEqual(lastArgs(aliceEvents), ["$rpcResult", 2, true, false], "rpc result 2 for Alice");
+        assert.deepEqual(lastArgs(aliceEvents), ["$rpcResult", 2, 0, false], "rpc result 2 for Alice");
         assert.equal(bobEvents.mock.callCount(), 1, "No messages for Bob");
     });
     await it("broadcast messages", () => {
@@ -133,11 +155,11 @@ void DESCRIBE("meta controller", async () => {
         bob.on("event", bobEvents);
         alice.message("$rpc", 1, "broadcast", "Hi there");
         assert.deepEqual(argsN(aliceEvents, 0), ["$rpcEvent", "message", "Alice", "Hi there"], "Alice got msg 1");
-        assert.deepEqual(argsN(aliceEvents, 1), ["$rpcResult", 1, true, true], "rpc result 1 for Alice");
+        assert.deepEqual(argsN(aliceEvents, 1), ["$rpcResult", 1, 0, true], "rpc result 1 for Alice");
         assert.deepEqual(argsN(bobEvents, 0), ["$rpcEvent", "message", "Alice", "Hi there"], "Bob got msg 1");
         bob.message("$rpc", 1, "broadcast", "Hello");
         assert.deepEqual(argsN(bobEvents, 1), ["$rpcEvent", "message", "Bob", "Hello"], "Bob got msg 2");
-        assert.deepEqual(argsN(bobEvents, 2), ["$rpcResult", 1, true, true], "rpc result 1 for Bob");
+        assert.deepEqual(argsN(bobEvents, 2), ["$rpcResult", 1, 0, true], "rpc result 1 for Bob");
         assert.deepEqual(argsN(aliceEvents, 2), ["$rpcEvent", "message", "Bob", "Hello"], "Alice got msg 2");
     });
     await it("get players", () => {
