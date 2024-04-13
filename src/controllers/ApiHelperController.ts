@@ -1,41 +1,45 @@
 import { Room } from "../varhub/Room.js";
 
-export class ApiHelperController {
+export type ApiHelper = Record<string, any> & Disposable
+export type ApiSource = Record<string, new (room: Room) => ApiHelper>
+
+export class ApiHelperController implements Disposable {
 	readonly #room: Room;
-	readonly #apiConstructorMap: Record<string, new (config?: any) => ApiHelper>;
+	readonly #apiSource: ApiSource;
 	readonly #apiInstance = new Map<string, ApiHelper>;
+	readonly #destroyHandler;
+	#disposed = false;
 	
-	constructor(room: Room, apiConstructorMap: Record<string, new (config?: any) => ApiHelper>) {
+	constructor(room: Room, apiSource: ApiSource) {
 		this.#room = room;
-		this.#apiConstructorMap = apiConstructorMap;
-		
-		room.on("destroy", () => {
-			for (const api of this.#apiInstance.values()) {
-				api.destroy();
-			}
-			this.#apiInstance.clear();
-		})
+		this.#apiSource = apiSource;
+		this.#destroyHandler = () => this[Symbol.dispose]();
+		room.on("destroy", this.#destroyHandler);
 	}
 	
-	getOrCreateApi(name: string, config?: any) {
-		if (this.#room.destroyed) return null;
+	getOrCreateApi(name: string): ApiHelper | undefined {
+		if (this.#disposed) return;
+		if (this.#room.destroyed) return;
 		const existsApi = this.#apiInstance.get(name);
 		if (existsApi) return existsApi;
 		
-		const apiConstructor = this.#apiConstructorMap[name];
-		if (!apiConstructor) return null;
-		const api = new apiConstructor(config);
+		const apiConstructor = this.#apiSource[name];
+		if (!apiConstructor) return;
+		const api = new apiConstructor(this.#room);
 		if (api) this.#apiInstance.set(name, api);
 		return api;
 	}
 	
-	getApi(name: string){
-		return this.#apiInstance.get(name) ?? null;
+	getApi(name: string): ApiHelper | undefined{
+		return this.#apiInstance.get(name);
 	}
 	
-}
-
-export interface ApiHelper {
-	call(...args: any): any;
-	destroy(): void;
+	[Symbol.dispose](): void {
+		this.#disposed = true;
+		this.#room.off("destroy", this.#destroyHandler);
+		for (const api of this.#apiInstance.values()) {
+			try { api[Symbol.dispose](); } catch {}
+		}
+		this.#apiInstance.clear();
+	}
 }

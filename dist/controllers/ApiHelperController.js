@@ -1,32 +1,43 @@
 export class ApiHelperController {
     #room;
-    #apiConstructorMap;
+    #apiSource;
     #apiInstance = new Map;
-    constructor(room, apiConstructorMap) {
+    #destroyHandler;
+    #disposed = false;
+    constructor(room, apiSource) {
         this.#room = room;
-        this.#apiConstructorMap = apiConstructorMap;
-        room.on("destroy", () => {
-            for (const api of this.#apiInstance.values()) {
-                api.destroy();
-            }
-            this.#apiInstance.clear();
-        });
+        this.#apiSource = apiSource;
+        this.#destroyHandler = () => this[Symbol.dispose]();
+        room.on("destroy", this.#destroyHandler);
     }
-    getOrCreateApi(name, config) {
+    getOrCreateApi(name) {
+        if (this.#disposed)
+            return;
         if (this.#room.destroyed)
-            return null;
+            return;
         const existsApi = this.#apiInstance.get(name);
         if (existsApi)
             return existsApi;
-        const apiConstructor = this.#apiConstructorMap[name];
+        const apiConstructor = this.#apiSource[name];
         if (!apiConstructor)
-            return null;
-        const api = new apiConstructor(config);
+            return;
+        const api = new apiConstructor(this.#room);
         if (api)
             this.#apiInstance.set(name, api);
         return api;
     }
     getApi(name) {
-        return this.#apiInstance.get(name) ?? null;
+        return this.#apiInstance.get(name);
+    }
+    [Symbol.dispose]() {
+        this.#disposed = true;
+        this.#room.off("destroy", this.#destroyHandler);
+        for (const api of this.#apiInstance.values()) {
+            try {
+                api[Symbol.dispose]();
+            }
+            catch { }
+        }
+        this.#apiInstance.clear();
     }
 }

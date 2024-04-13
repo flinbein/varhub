@@ -60,4 +60,7 @@ export class Room extends TypedEventEmitter {
         this.removeAllListeners();
         return true;
     }
+    [Symbol.dispose]() {
+        return this.destroy();
+    }
 }

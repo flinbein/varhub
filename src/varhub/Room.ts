@@ -13,7 +13,7 @@ export type RoomEvents = {
 	connectionClosed: [member: Connection, online: boolean, message: string|null]
 	destroy: [],
 }
-export class Room extends TypedEventEmitter<RoomEvents> {
+export class Room extends TypedEventEmitter<RoomEvents> implements Disposable {
 	#publicMessage: string | null = null;
 	#lobbyConnectionsSet = new Set<Connection>();
 	#joinedConnectionsSet = new Set<Connection>();
@@ -73,5 +73,9 @@ export class Room extends TypedEventEmitter<RoomEvents> {
 		this.emit("destroy");
 		this.removeAllListeners();
 		return true;
+	}
+	
+	[Symbol.dispose](){
+		return this.destroy();
 	}
 }

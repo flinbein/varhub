@@ -7,13 +7,18 @@ import { RPCController } from "../controllers/RPCController.js";
 import { ApiHelper, ApiHelperController } from "../controllers/ApiHelperController.js";
 
 class CounterApi implements ApiHelper {
-	constructor(public counter: number) {}
-	destroy() {
-		this.counter = 0;
+	#counter = 0;
+	constructor() {}
+	
+	set = (arg: number) => {
+		this.#counter = arg;
+	}
+	increment = (arg: number) => {
+		return this.#counter += arg;
 	}
 	
-	call(arg: number){
-		return this.counter += arg;
+	[Symbol.dispose](){
+		this.#counter = 0;
 	}
 }
 
@@ -30,7 +35,8 @@ class ChatController {
 		this.playerController = new PlayerController(room);
 		this.apiHelperController = new ApiHelperController(room, apiHelpers);
 		
-		this.counterApi = this.apiHelperController.getOrCreateApi("counter", 1000) as CounterApi;
+		this.counterApi = this.apiHelperController.getOrCreateApi("counter") as CounterApi;
+		this.counterApi.set(1000);
 		
 		this.rpcController = new RPCController(room, (connection, [method, ...args]) => {
 			const player = this.playerController.getPlayerOfConnection(connection);
@@ -48,11 +54,11 @@ class ChatController {
 				recipientPlayer.sendEvent("$rpcEvent", "privateMessage", playerId, args[1]);
 				return true;
 			} else if (method === "changeCounter") {
-				const result = this.counterApi.call(args[0]);
+				const result = this.counterApi.increment(args[0]);
 				this.playerController.broadcastEvent("$rpcEvent", "counter", result);
 				return result;
 			} else if (method === "getCounter") {
-				return this.counterApi.call(0);
+				return this.counterApi.increment(0);
 			} else if (method === "getPlayers") {
 				return new Set(this.playerController.getPlayers().keys());
 			} else {
