@@ -1,9 +1,9 @@
 import { default as assert } from "node:assert";
 import { describe as DESCRIBE, it, mock } from "node:test";
-import { Room } from "../varhub/Room.js";
-import { PlayerController } from "../controllers/PlayerController.js";
-import { RPCController } from "../controllers/RPCController.js";
-import { ApiHelperController } from "../controllers/ApiHelperController.js";
+import { Room } from "../src/varhub/Room.js";
+import { PlayerController } from "../src/controllers/PlayerController.js";
+import { RPCController } from "../src/controllers/RPCController.js";
+import { ApiHelperController } from "../src/controllers/ApiHelperController.js";
 class CounterApi {
     #counter = 0;
     constructor() { }
@@ -71,7 +71,7 @@ class ChatController {
             .addHandler((connection, method, incrementValue) => {
             if (method !== "changeCounter")
                 return;
-            return (connection, m, i) => {
+            return () => {
                 const result = this.counterApi.increment(Number(incrementValue));
                 this.playerController.broadcastEvent("$rpcEvent", "counter", result);
                 return result;

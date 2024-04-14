@@ -1,8 +1,8 @@
 import { default as assert } from "node:assert";
 import { describe as DESCRIBE, it, Mock, mock } from "node:test";
 
-import { Room } from "../varhub/Room.js";
-import { Connection } from "../varhub/Connection.js";
+import { Room } from "../src/varhub/Room.js";
+import { Connection } from "../src/varhub/Connection.js";
 
 class RoomController {
 	#memberNames = new WeakMap<Connection, string>();

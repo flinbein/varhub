@@ -1,7 +1,7 @@
 import { default as assert } from "node:assert";
 import { describe as DESCRIBE, it, mock } from "node:test";
-import { Room } from "../varhub/Room.js";
-import { Hub } from "../varhub/Hub.js";
+import { Room } from "../src/varhub/Room.js";
+import { Hub } from "../src/varhub/Hub.js";
 const lastArgs = ({ mock }) => mock.calls[mock.callCount() - 1]?.arguments;
 void DESCRIBE("Hub with rooms", async () => {
     await it("register room", () => {
