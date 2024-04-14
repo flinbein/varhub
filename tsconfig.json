@@ -22,9 +22,8 @@
 	"buildOptions": {
 		"verbose": true
 	},
+	"include": ["src/**/*"],
 	"exclude": [
-		"./node_modules/**/*",
-		"**/*/__test__/**/*",
-		"**/*/__tests__/**/*"
+		"./node_modules/**/*"
 	]
 }
