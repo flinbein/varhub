@@ -59,14 +59,11 @@ class ChatController {
 				}
 			}))
 			.addHandler(playerHandler((player, playerId, method, recipientId, message) => {
-				console.log("CHECK PRIVATE", method);
 				if (method !== "private") return;
 				return () => {
-					console.log("CALL PRIVATE GO", playerId, recipientId, message);
 					const recipientPlayer = this.playerController.getPlayerById(String(recipientId));
 					if (!recipientPlayer) return false;
 					if (!recipientPlayer.online) return false;
-					console.log("CALL PRIVATE EVT", "$rpcEvent", "privateMessage", playerId, message);
 					recipientPlayer.sendEvent("$rpcEvent", "privateMessage", playerId, message);
 					return true;
 				}

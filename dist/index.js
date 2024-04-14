@@ -5,3 +5,4 @@ export { default as TypedEventEmitter } from "./utils/TypedEventEmitter.js";
 export { ApiHelperController } from "./controllers/ApiHelperController.js";
 export { PlayerController } from "./controllers/PlayerController.js";
 export { RPCController } from "./controllers/RPCController.js";
+export { TimeoutDestroyController } from "./controllers/TimeoutDestroyController.js";
