@@ -43,7 +43,7 @@ export class PlayerController extends TypedEventEmitter<PlayerControllerEvents>{
 			if (this.closed) return room.kick(connection, "room is closed");
 
 			// new player
-			const newPlayer = new Player(config);
+			const newPlayer = new Player(id, config);
 			this.#players.set(id, newPlayer);
 			this.#idOfPlayer.set(newPlayer, id);
 			this.#passwordOfPlayer.set(newPlayer, password);
@@ -65,8 +65,8 @@ export class PlayerController extends TypedEventEmitter<PlayerControllerEvents>{
 	}
 	
 	kick(player: Player, reason: string|null = null): boolean {
-		if (!this.#idOfPlayer.has(player)) return false;
-		const id = this.#idOfPlayer.get(player) as string;
+		const id = this.#idOfPlayer.get(player);
+		if (id == undefined) return false;
 		this.#players.delete(id);
 		this.#idOfPlayer.delete(player);
 		this.#passwordOfPlayer.delete(player);
@@ -103,8 +103,13 @@ export class PlayerController extends TypedEventEmitter<PlayerControllerEvents>{
 
 
 class Player {
-	readonly #connections = new Set<Connection>()
-	constructor(public readonly config: any) {}
+	readonly #connections = new Set<Connection>();
+	readonly #id: string;
+	constructor(id: string, public readonly config: any) {
+		this.#id = id;
+	}
+	
+	get id() {return this.#id};
 	
 	get online(){
 		return this.#connections.size > 0;
