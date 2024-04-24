@@ -34,9 +34,9 @@ export class Connection extends TypedEventEmitter<MemberEvents> {
 		this.#id = id;
 		this.#call = call;
 		this.#room = room;
-		room.on("connectionJoin", this.#connectionJoinListener);
-		room.on("connectionClosed", this.#connectionClosedListener);
-		room.on("destroy", this.#roomDestroyListener);
+		room.prependListener("connectionJoin", this.#connectionJoinListener);
+		room.prependListener("connectionClosed", this.#connectionClosedListener);
+		room.prependListener("destroy", this.#roomDestroyListener);
 	}
 	
 	get id(){
