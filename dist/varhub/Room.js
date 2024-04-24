@@ -20,9 +20,11 @@ export class Room extends TypedEventEmitter {
             return;
         this.emit("connectionMessage", connection, ...args);
     }
+    #connectionId = 0;
     createConnection(...enterArgs) {
+        const connectionId = this.#connectionId++;
         const call = (...args) => this.#connectionMessage(connection, ...args);
-        const connection = new Connection(this, call);
+        const connection = new Connection(this, connectionId, call);
         this.#lobbyConnectionsSet.add(connection);
         this.emit("connectionEnter", connection, ...enterArgs);
         return connection;

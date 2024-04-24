@@ -1,10 +1,10 @@
 import { MapOfSet } from "../utils/MapOfSet.js";
 import TypedEventEmitter from "../utils/TypedEventEmitter.js";
 import { Room } from "./Room.js";
-import { CustomType } from "../types.js";
+import { Brand } from "../types.js";
 
-type RoomId = CustomType<string, Room, "id">;
-type RoomIntegrityId = CustomType<string|null, Room, "publicId">;
+type RoomId = Brand<string, [Room, "id"]>;
+type RoomIntegrityId = Brand<string|null, [Room, "publicId"]>;
 type HubEvents = {
 	dropRoom: [roomId: RoomId, room: Room],
 	addRoom: [roomId: RoomId, room: Room],

@@ -8,6 +8,7 @@ type MemberEvents = {
 }
 export class Connection extends TypedEventEmitter<MemberEvents> {
 	readonly #call: (...args: unknown[]) => void;
+	readonly #id: number;
 	readonly #room: Room;
 	#status: "lobby" | "joined" | "disconnected" = "lobby";
 	#connectionJoinListener = (member: Connection) => {
@@ -28,8 +29,9 @@ export class Connection extends TypedEventEmitter<MemberEvents> {
 		this.#onDisconnect("room destroyed");
 	}
 	
-	constructor(room: Room, call: (...args: unknown[]) => unknown) {
+	constructor(room: Room, id: number, call: (...args: unknown[]) => unknown) {
 		super();
+		this.#id = id;
 		this.#call = call;
 		this.#room = room;
 		room.on("connectionJoin", this.#connectionJoinListener);
@@ -37,6 +39,9 @@ export class Connection extends TypedEventEmitter<MemberEvents> {
 		room.on("destroy", this.#roomDestroyListener);
 	}
 	
+	get id(){
+		return this.#id;
+	}
 	get connected(){
 		return this.#status === "joined" || this.#status === "lobby";
 	}
