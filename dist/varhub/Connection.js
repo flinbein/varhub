@@ -1,9 +1,10 @@
 import TypedEventEmitter from "../utils/TypedEventEmitter.js";
 export class Connection extends TypedEventEmitter {
     #call;
+    #enter;
     #id;
     #room;
-    #status = "lobby";
+    #status = "new";
     #connectionJoinListener = (member) => {
         if (member !== this)
             return;
@@ -21,11 +22,12 @@ export class Connection extends TypedEventEmitter {
     #roomDestroyListener = () => {
         this.#onDisconnect("room destroyed");
     };
-    constructor(room, id, call) {
+    constructor(room, id, call, enter) {
         super();
         this.#id = id;
         this.#call = call;
         this.#room = room;
+        this.#enter = enter;
         room.prependListener("connectionJoin", this.#connectionJoinListener);
         room.prependListener("connectionClosed", this.#connectionClosedListener);
         room.prependListener("destroy", this.#roomDestroyListener);
@@ -35,6 +37,13 @@ export class Connection extends TypedEventEmitter {
     }
     get connected() {
         return this.#status === "joined" || this.#status === "lobby";
+    }
+    enter(...args) {
+        if (this.#status !== "new")
+            throw new Error("wrong connections status");
+        this.#status = "lobby";
+        this.#enter(...args);
+        return this;
     }
     message(...args) {
         return this.#call(...args);

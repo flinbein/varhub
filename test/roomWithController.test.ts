@@ -33,10 +33,10 @@ void DESCRIBE("Room with controller", async () => {
 		const room = new Room();
 		new RoomController(room);
 		
-		const userAlice = room.createConnection("Alice");
+		const userAlice = room.createConnection().enter("Alice");
 		const aliceEvents = mock.fn();
 		userAlice.on("event", aliceEvents);
-		const userBob = room.createConnection("Bob");
+		const userBob = room.createConnection().enter("Bob");
 		const bobEvents = mock.fn();
 		userBob.on("event", bobEvents);
 		

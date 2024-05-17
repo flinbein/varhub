@@ -8,9 +8,10 @@ type MemberEvents = {
 }
 export class Connection extends TypedEventEmitter<MemberEvents> {
 	readonly #call: (...args: unknown[]) => void;
+	readonly #enter: (...args: unknown[]) => void;
 	readonly #id: number;
 	readonly #room: Room;
-	#status: "lobby" | "joined" | "disconnected" = "lobby";
+	#status: "new" | "lobby" | "joined" | "disconnected" = "new";
 	#connectionJoinListener = (member: Connection) => {
 		if (member !== this) return;
 		this.#status = "joined";
@@ -29,11 +30,12 @@ export class Connection extends TypedEventEmitter<MemberEvents> {
 		this.#onDisconnect("room destroyed");
 	}
 	
-	constructor(room: Room, id: number, call: (...args: unknown[]) => unknown) {
+	constructor(room: Room, id: number, call: (...args: unknown[]) => void, enter: (...args: unknown[]) => void) {
 		super();
 		this.#id = id;
 		this.#call = call;
 		this.#room = room;
+		this.#enter = enter;
 		room.prependListener("connectionJoin", this.#connectionJoinListener);
 		room.prependListener("connectionClosed", this.#connectionClosedListener);
 		room.prependListener("destroy", this.#roomDestroyListener);
@@ -44,6 +46,13 @@ export class Connection extends TypedEventEmitter<MemberEvents> {
 	}
 	get connected(){
 		return this.#status === "joined" || this.#status === "lobby";
+	}
+	
+	enter(...args: unknown[]): this {
+		if (this.#status !== "new") throw new Error("wrong connections status");
+		this.#status = "lobby";
+		this.#enter(...args);
+		return this;
 	}
 	
 	message(...args: unknown[]): void {

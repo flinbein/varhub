@@ -35,12 +35,14 @@ export class Room extends TypedEventEmitter<RoomEvents> implements Disposable {
 	}
 	
 	#connectionId = 0;
-	createConnection(...enterArgs: any[]): Connection {
+	createConnection(): Connection {
 		const connectionId = this.#connectionId++;
 		const call = (...args: any[]) => this.#connectionMessage(connection, ...args);
-		const connection: Connection = new Connection(this, connectionId, call);
-		this.#lobbyConnectionsSet.add(connection);
-		this.emit("connectionEnter", connection, ...enterArgs);
+		const enter = (...enterArgs: any[]) => {
+			this.#lobbyConnectionsSet.add(connection);
+			this.emit("connectionEnter", connection, ...enterArgs);
+		};
+		const connection: Connection = new Connection(this, connectionId, call, enter);
 		return connection;
 	}
 	join(connection: Connection): boolean {

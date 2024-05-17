@@ -108,13 +108,13 @@ void DESCRIBE("meta controller", async () => {
 		ctrl.playerController.on("online", playerOnlineHdl);
 		ctrl.playerController.on("offline", playerOfflineHdl);
 		
-		const alice1 = room.createConnection("Alice");
+		const alice1 = room.createConnection().enter("Alice");
 		const alicePlayer = ctrl.playerController.getPlayerById("Alice") as Player;
 		assert.ok(alice1.connected, "Alice1 connected");
 		assert.equal(playerJoinHdl.mock.callCount(), 1, "one join event");
 		assert.deepEqual(lastArgs(playerJoinHdl), [alicePlayer], "Alice in join event");
 		
-		const alice2 = room.createConnection("Alice");
+		const alice2 = room.createConnection().enter("Alice");
 		assert.ok(alice2.connected, "Alice2 connected");
 		assert.equal(playerJoinHdl.mock.callCount(), 1, "one join event again");
 		
@@ -128,7 +128,7 @@ void DESCRIBE("meta controller", async () => {
 		assert.deepEqual(lastArgs(playerOfflineHdl), [alicePlayer], "Alice goes offline event");
 		assert.equal(ctrl.playerController.getPlayerById("Alice"), alicePlayer, "player still in ctrl");
 		
-		const alice3 = room.createConnection("Alice");
+		const alice3 = room.createConnection().enter("Alice");
 		assert.equal(playerOfflineHdl.mock.callCount(), 1, "1 online event");
 		assert.deepEqual(lastArgs(playerOfflineHdl), [alicePlayer], "Alice goes online event");
 		
@@ -143,9 +143,9 @@ void DESCRIBE("meta controller", async () => {
 		const aliceEvents = mock.fn();
 		const bobEvents = mock.fn();
 		
-		const alice = room.createConnection("Alice");
+		const alice = room.createConnection().enter("Alice");
 		alice.on("event", aliceEvents);
-		const bob = room.createConnection("Bob");
+		const bob = room.createConnection().enter("Bob");
 		bob.on("event", bobEvents);
 		
 		alice.message("$rpc", 1, "private", "Bob", "Hello");
@@ -164,9 +164,9 @@ void DESCRIBE("meta controller", async () => {
 		const aliceEvents = mock.fn();
 		new ChatController(room);
 		
-		const alice = room.createConnection("Alice");
+		const alice = room.createConnection().enter("Alice");
 		alice.on("event", aliceEvents);
-		const bob = room.createConnection("Bob");
+		const bob = room.createConnection().enter("Bob");
 		bob.on("event", bobEvents);
 		
 		alice.message("$rpc", 1, "broadcast", "Hi there");
@@ -185,10 +185,10 @@ void DESCRIBE("meta controller", async () => {
 		new ChatController(room);
 		const aliceEvents = mock.fn();
 		
-		const alice = room.createConnection("Alice");
+		const alice = room.createConnection().enter("Alice");
 		alice.on("event", aliceEvents);
-		room.createConnection("Bob");
-		room.createConnection("Bob");
+		room.createConnection().enter("Bob");
+		room.createConnection().enter("Bob");
 		alice.message("$rpc", 1, "getPlayers");
 		
 		const rpcResult = lastArgs(aliceEvents);
@@ -203,7 +203,7 @@ void DESCRIBE("meta controller", async () => {
 		new ChatController(room);
 		const aliceEvents = mock.fn();
 		
-		const alice = room.createConnection("Alice");
+		const alice = room.createConnection().enter("Alice");
 		alice.on("event", aliceEvents);
 		alice.message("$rpc", 1, "getCounter");
 		
@@ -218,9 +218,9 @@ void DESCRIBE("meta controller", async () => {
 		const aliceEvents = mock.fn();
 		const bobEvents = mock.fn();
 		
-		const alice = room.createConnection("Alice");
+		const alice = room.createConnection().enter("Alice");
 		alice.on("event", aliceEvents);
-		const bob = room.createConnection("Bob");
+		const bob = room.createConnection().enter("Bob");
 		bob.on("event", bobEvents);
 		alice.message("$rpc", 1, "changeCounter", 20);
 		

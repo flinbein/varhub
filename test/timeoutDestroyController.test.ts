@@ -23,7 +23,7 @@ void describe("TimeoutDestroyController", () => {
 		await new Promise(r => setTimeout(r, 5));
 		
 		assert.ok(!room.destroyed, "room not destroyed");
-		const connection = room.createConnection();
+		const connection = room.createConnection().enter();
 		await new Promise(r => setTimeout(r, 30));
 		
 		assert.ok(!room.destroyed, "room not destroyed with connection");
