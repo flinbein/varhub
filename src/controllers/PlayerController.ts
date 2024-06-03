@@ -102,7 +102,7 @@ export class PlayerController extends TypedEventEmitter<PlayerControllerEvents>{
 }
 
 
-class Player {
+export class Player {
 	readonly #connections = new Set<Connection>();
 	readonly #id: string;
 	constructor(id: string, public readonly config: any) {
@@ -134,5 +134,3 @@ class Player {
 		}
 	}
 }
-
-export {type Player}

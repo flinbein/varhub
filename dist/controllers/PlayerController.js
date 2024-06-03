@@ -88,7 +88,7 @@ export class PlayerController extends TypedEventEmitter {
         }
     }
 }
-class Player {
+export class Player {
     config;
     #connections = new Set();
     #id;
