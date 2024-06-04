@@ -34,6 +34,10 @@ export class ApiHelperController implements Disposable {
 		return this.#apiInstance.get(name);
 	}
 	
+	getApiNames(): string[] {
+		return Object.keys(this.#apiSource);
+	}
+	
 	[Symbol.dispose](): void {
 		this.#disposed = true;
 		this.#room.off("destroy", this.#destroyHandler);

@@ -29,6 +29,9 @@ export class ApiHelperController {
     getApi(name) {
         return this.#apiInstance.get(name);
     }
+    getApiNames() {
+        return Object.keys(this.#apiSource);
+    }
     [Symbol.dispose]() {
         this.#disposed = true;
         this.#room.off("destroy", this.#destroyHandler);
