@@ -20,6 +20,8 @@ export class MapOfSet<K, V> {
 	}
 	delete(key: K, value: V){
 		let set = this.#map.get(key);
-		return set?.delete(value) ?? false;
+		const result = set?.delete(value) ?? false;
+		if (set?.size === 0) this.#map.delete(key);
+		return result;
 	}
 }

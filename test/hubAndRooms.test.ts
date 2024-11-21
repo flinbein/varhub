@@ -161,4 +161,16 @@ void DESCRIBE("Hub with rooms", async () => {
 		assert.equal(dropEvents.mock.callCount(), 2, "no extra drop events");
 	});
 	
+	await it("get registered room id", () => {
+		const hub = new Hub();
+		const room1 = new Room();
+		const room2 = new Room();
+		const roomId1 = hub.addRoom(room1);
+		const roomId2 = hub.addRoom(room1);
+		assert.deepEqual(hub.getRegisteredId(room1), new Set([roomId1, roomId2]), "two rooms registered");
+		assert.deepEqual(hub.getRegisteredId(room2), new Set(), "not reg room");
+		room1.destroy();
+		assert.deepEqual(hub.getRegisteredId(room1), new Set(), "two rooms registered");
+	});
+	
 })

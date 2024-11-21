@@ -3,7 +3,8 @@ import TypedEventEmitter from "../utils/TypedEventEmitter.js";
 export class Hub extends TypedEventEmitter {
     #rooms = new Map;
     #roomIdIntegrity = new Map;
-    #integrityOfRooms = new MapOfSet;
+    #integrityToRooms = new MapOfSet;
+    #roomToIdSet = new MapOfSet;
     addRoom(room, integrity) {
         if (room.destroyed)
             return null;
@@ -11,8 +12,9 @@ export class Hub extends TypedEventEmitter {
         this.#roomIdIntegrity.set(roomId, integrity);
         this.#rooms.set(roomId, room);
         if (integrity)
-            this.#integrityOfRooms.add(integrity, roomId);
+            this.#integrityToRooms.add(integrity, roomId);
         room.once("destroy", () => this.#onRoomDrop(roomId, room));
+        this.#roomToIdSet.add(room, roomId);
         this.emit("addRoom", roomId, room);
         return roomId;
     }
@@ -32,8 +34,11 @@ export class Hub extends TypedEventEmitter {
     getRooms() {
         return new Set(this.#rooms.keys());
     }
+    getRegisteredId(room) {
+        return new Set(this.#roomToIdSet.get(room));
+    }
     getRoomsByIntegrity(integrity) {
-        return new Set(this.#integrityOfRooms.get(integrity) ?? null);
+        return new Set(this.#integrityToRooms.get(integrity) ?? null);
     }
     #onRoomDrop(roomId, room) {
         const roomIsDeleted = this.#rooms.delete(roomId);
@@ -42,7 +47,8 @@ export class Hub extends TypedEventEmitter {
         const integrity = this.#roomIdIntegrity.get(roomId);
         this.#roomIdIntegrity.delete(roomId);
         if (integrity != null)
-            this.#integrityOfRooms.delete(integrity, roomId);
+            this.#integrityToRooms.delete(integrity, roomId);
+        this.#roomToIdSet.delete(room, roomId);
         this.emit("dropRoom", roomId, room);
     }
 }
